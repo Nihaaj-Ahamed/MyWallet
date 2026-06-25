@@ -125,7 +125,7 @@ export default function FABModal() {
       {/* Floating Action Button */}
       <button
         onClick={handleOpen}
-        className="no-print fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-obsidian-light border border-champagne text-champagne shadow-gold-glow hover:shadow-gold-glow-lg transition-all duration-300 hover:scale-105"
+        className="no-print fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-obsidian-light border border-champagne text-champagne shadow-gold-glow transition-all duration-300 active:scale-95"
         aria-label="Add entry"
       >
         <Plus className="h-6 w-6 stroke-[2]" />
@@ -159,7 +159,7 @@ export default function FABModal() {
                 </h3>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="rounded-full p-1 text-slate-muted hover:bg-white/5 hover:text-white transition-colors"
+                  className="rounded-full p-2.5 text-slate-muted active:bg-white/5 active:text-white transition-all active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -181,10 +181,10 @@ export default function FABModal() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex-shrink-0 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
+                      className={`flex-shrink-0 flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg text-xs font-medium transition-all duration-300 min-h-[44px] active:scale-95 ${
                         isActive
                           ? 'bg-champagne/15 text-champagne border border-champagne/30 shadow-inner'
-                          : 'text-slate-muted hover:text-white hover:bg-white/5'
+                          : 'text-slate-muted active:text-white active:bg-white/5'
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -203,13 +203,13 @@ export default function FABModal() {
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold">Payment Source</label>
                       <div className="flex border border-slate-border/50 rounded-lg p-1 bg-obsidian/30">
-                        <button
+                         <button
                           type="button"
                           onClick={() => setPaymentSource('hand')}
-                          className={`flex-1 py-2 text-xs font-semibold rounded transition-all ${
+                          className={`flex-1 py-3 text-xs font-semibold rounded transition-all min-h-[44px] active:scale-95 ${
                             paymentSource === 'hand'
                               ? 'bg-champagne text-obsidian font-bold shadow'
-                              : 'text-slate-muted hover:text-white'
+                              : 'text-slate-muted active:text-white'
                           }`}
                         >
                           Hand Money
@@ -217,10 +217,10 @@ export default function FABModal() {
                         <button
                           type="button"
                           onClick={() => setPaymentSource('bank')}
-                          className={`flex-1 py-2 text-xs font-semibold rounded transition-all ${
+                          className={`flex-1 py-3 text-xs font-semibold rounded transition-all min-h-[44px] active:scale-95 ${
                             paymentSource === 'bank'
                               ? 'bg-champagne text-obsidian font-bold shadow'
-                              : 'text-slate-muted hover:text-white'
+                              : 'text-slate-muted active:text-white'
                           }`}
                         >
                           Bank Money
@@ -400,7 +400,7 @@ export default function FABModal() {
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Debt Relationship</label>
                       <div className="flex gap-4">
-                        <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-border/50 py-3 cursor-pointer bg-obsidian/30 transition-all duration-300 hover:border-champagne/40">
+                         <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-border/50 min-h-[44px] py-3 cursor-pointer bg-obsidian/30 transition-all active:scale-95 active:border-champagne/40">
                           <input
                             type="radio"
                             name="debtType"
@@ -411,7 +411,7 @@ export default function FABModal() {
                           <span className={`text-xs font-semibold ${debtType === 'lent' ? 'text-champagne' : 'text-slate-muted'}`}>Lent (They owe me)</span>
                         </label>
 
-                        <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-border/50 py-3 cursor-pointer bg-obsidian/30 transition-all duration-300 hover:border-crimson/40">
+                        <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-border/50 min-h-[44px] py-3 cursor-pointer bg-obsidian/30 transition-all active:scale-95 active:border-crimson/40">
                           <input
                             type="radio"
                             name="debtType"
@@ -502,13 +502,13 @@ export default function FABModal() {
                   <button
                     type="button"
                     onClick={() => setIsOpen(false)}
-                    className="flex-1 rounded-lg border border-slate-border/50 py-3 text-sm font-medium text-slate-muted hover:bg-white/5 hover:text-white transition-colors"
+                    className="flex-1 rounded-lg border border-slate-border/50 min-h-[44px] py-3 text-sm font-medium text-slate-muted active:bg-white/5 active:text-white transition-all active:scale-95 flex items-center justify-center"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-champagne hover:bg-champagne-light py-3 text-sm font-semibold text-obsidian shadow-gold-glow transition-all duration-300 hover:scale-[1.02]"
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-champagne py-3 text-sm font-semibold text-obsidian shadow-gold-glow transition-all duration-300 active:scale-95 min-h-[44px]"
                   >
                     <Check className="h-4 w-4 stroke-[2.5]" />
                     <span>Post Ledger</span>

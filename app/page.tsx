@@ -31,7 +31,9 @@ import {
   Check,
   Edit3,
   X,
-  Trash2
+  Trash2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -103,6 +105,32 @@ export default function Dashboard() {
 
   // Expanded monthly date timeline accordion state
   const [expandedMonthlyDates, setExpandedMonthlyDates] = useState<{ [key: string]: boolean }>({});
+
+  // Accent multi-theme switcher state
+  const [theme, setTheme] = useState<'champagne' | 'emerald' | 'crimson'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vault_theme');
+      return (saved as 'champagne' | 'emerald' | 'crimson') || 'champagne';
+    }
+    return 'champagne';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('vault_theme', theme);
+  }, [theme]);
+
+  // Privacy blurring state (default to true / blurred)
+  const [isBlurred, setIsBlurred] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vault_blurred');
+      return saved === null ? true : saved === 'true';
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('vault_blurred', isBlurred ? 'true' : 'false');
+  }, [isBlurred]);
 
   // Helper to format date in user's local YYYY-MM-DD
   const getLocalDateString = (d: Date = new Date()) => {
@@ -427,9 +455,14 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-obsidian text-champagne">
-        <div className="flex flex-col items-center gap-3">
-          <RefreshCw className="h-8 w-8 animate-spin stroke-[1.5]" />
-          <span className="font-mono text-sm tracking-wider uppercase text-champagne/85">Syncing Aura Ledger...</span>
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-champagne/10 border border-champagne/20 text-champagne shadow-gold-glow animate-pulse">
+            <img src="/logo.png" alt="MyWallet Logo" className="h-10 w-10 object-contain" />
+          </div>
+          <div className="flex items-center gap-2">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-muted" />
+            <span className="font-mono text-[10px] tracking-widest uppercase text-slate-muted">Syncing Aura Ledger...</span>
+          </div>
         </div>
       </div>
     );
@@ -439,14 +472,14 @@ export default function Dashboard() {
   const groupedTimeline = groupTransactionsByDate(activeTransactions);
 
   return (
-    <main className="min-h-screen bg-obsidian text-slate-muted pb-24 print:pb-0">
+    <main className={`min-h-screen bg-obsidian text-slate-muted pb-24 print:pb-0 theme-${theme}`}>
       
       {/* HEADER NAVIGATION */}
       <header className="no-print sticky top-0 z-35 bg-obsidian/95 backdrop-blur-md border-b border-slate-border/50 px-4 py-4 md:px-8 max-w-7xl mx-auto flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-champagne/10 border border-champagne/30 text-champagne shadow-gold-glow">
-              <Wallet className="h-4.5 w-4.5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-champagne/10 border border-champagne/30 text-champagne shadow-gold-glow overflow-hidden">
+              <img src="/logo.png" alt="MyWallet Logo" className="h-6 w-6 object-contain" />
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight text-white uppercase flex items-center gap-1.5">
@@ -454,6 +487,36 @@ export default function Dashboard() {
               </h1>
               <p className="text-[10px] text-slate-muted">High-End Liquid Wealth & Commute Tracker</p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {/* Compact Accent Theme Cycle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextTheme = theme === 'champagne' ? 'emerald' : theme === 'emerald' ? 'crimson' : 'champagne';
+                setTheme(nextTheme);
+              }}
+              className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-lg bg-obsidian-light/80 border border-slate-border/50 transition-all active:scale-95"
+              title={`Active Accent: ${theme.charAt(0).toUpperCase() + theme.slice(1)}. Tap to change.`}
+            >
+              <div 
+                className="w-3.5 h-3.5 rounded-full transition-all duration-300 ring-2 ring-white/20"
+                style={{
+                  backgroundColor: theme === 'champagne' ? '#D4AF37' : theme === 'emerald' ? '#00E676' : '#FF5252'
+                }}
+              />
+            </button>
+
+            {/* Shutter Eye Privacy Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsBlurred(prev => !prev)}
+              className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-lg bg-obsidian-light/80 border border-slate-border/50 text-slate-muted active:text-white transition-all active:scale-95"
+              title={isBlurred ? "Show monetary values" : "Blur monetary values"}
+            >
+              {isBlurred ? <EyeOff className="h-5 w-5 text-champagne" /> : <Eye className="h-5 w-5 text-slate-muted" />}
+            </button>
           </div>
         </div>
 
@@ -471,10 +534,10 @@ export default function Dashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveMobileTab(tab.id)}
-                className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-md text-[9px] font-medium transition-all duration-300 ${
+                className={`flex-1 flex flex-col items-center justify-center min-h-[44px] py-2 rounded-md text-[9px] font-medium transition-all active:scale-95 ${
                   isActive
-                    ? 'bg-champagne/15 text-champagne border border-champagne/30'
-                    : 'text-slate-muted hover:text-white'
+                    ? 'bg-champagne/15 text-champagne border border-champagne/30 font-bold'
+                    : 'text-slate-muted active:text-white'
                 }`}
               >
                 <Icon className="h-4 w-4 mb-0.5" />
@@ -494,7 +557,7 @@ export default function Dashboard() {
             <Sparkles className="h-3.5 w-3.5 text-champagne" /> Combined Net Worth <Sparkles className="h-3.5 w-3.5 text-champagne" />
           </p>
           
-          <h2 className="mt-2 text-4xl md:text-5xl font-mono font-bold tracking-tight text-champagne text-gold-glow">
+          <h2 className={`mt-2 text-4xl md:text-5xl font-mono font-bold tracking-tight text-champagne text-gold-glow transition-all duration-300 ${isBlurred ? 'privacy-blur' : ''}`}>
             Rs. {netWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
         </section>
@@ -505,7 +568,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           
           {/* 1. BANK MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group hover:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Bank Money</span>
               <Landmark className="h-4 w-4 text-champagne" />
@@ -529,15 +592,16 @@ export default function Dashboard() {
               <div className="flex items-baseline justify-between">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className="text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer hover:text-champagne transition-colors"
+                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {bankMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
+                  type="button"
                   onClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-muted hover:text-white transition-opacity"
+                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                 >
-                  <Pencil className="h-3 w-3" />
+                  <Pencil className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
@@ -545,7 +609,7 @@ export default function Dashboard() {
           </div>
 
           {/* 2. LIQUID / HAND MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group hover:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Hand Money</span>
               <Coins className="h-4 w-4 text-champagne" />
@@ -569,15 +633,16 @@ export default function Dashboard() {
               <div className="flex items-baseline justify-between">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className="text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer hover:text-champagne transition-colors"
+                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {handMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
+                  type="button"
                   onClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-muted hover:text-white transition-opacity"
+                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                 >
-                  <Pencil className="h-3 w-3" />
+                  <Pencil className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
@@ -585,7 +650,7 @@ export default function Dashboard() {
           </div>
 
           {/* 3. SAVING MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group hover:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Saving Money</span>
               <Wallet className="h-4 w-4 text-champagne" />
@@ -609,15 +674,16 @@ export default function Dashboard() {
               <div className="flex items-baseline justify-between">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
-                  className="text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer hover:text-champagne transition-colors"
+                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {savingMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
+                  type="button"
                   onClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-muted hover:text-white transition-opacity"
+                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                 >
-                  <Pencil className="h-3 w-3" />
+                  <Pencil className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
@@ -625,23 +691,25 @@ export default function Dashboard() {
           </div>
 
           {/* 4. OPTION MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group hover:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Option Money</span>
-              <div className="flex gap-1">
+              <div className="flex gap-1.5 items-center">
                 <button 
+                  type="button"
                   onClick={() => handleStepOptionMoney('dec')}
-                  className="bg-obsidian border border-slate-border/30 h-5 w-5 rounded flex items-center justify-center text-slate-muted hover:text-white hover:border-champagne/30"
+                  className="bg-obsidian border border-slate-border/30 h-11 w-11 min-h-[44px] min-w-[44px] rounded flex items-center justify-center text-slate-muted active:text-white active:scale-95"
                   title="Subtract Rs. 1,000"
                 >
-                  <Minus className="h-3 w-3" />
+                  <Minus className="h-4 w-4" />
                 </button>
                 <button 
+                  type="button"
                   onClick={() => handleStepOptionMoney('inc')}
-                  className="bg-obsidian border border-slate-border/30 h-5 w-5 rounded flex items-center justify-center text-slate-muted hover:text-white hover:border-champagne/30"
+                  className="bg-obsidian border border-slate-border/30 h-11 w-11 min-h-[44px] min-w-[44px] rounded flex items-center justify-center text-slate-muted active:text-white active:scale-95"
                   title="Add Rs. 1,000"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -664,15 +732,16 @@ export default function Dashboard() {
               <div className="flex items-baseline justify-between">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-option', optionMoney)}
-                  className="text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer hover:text-champagne transition-colors"
+                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {optionMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
+                  type="button"
                   onClick={() => handleStartEditWallet('wallet-option', optionMoney)}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-muted hover:text-white transition-opacity"
+                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                 >
-                  <Pencil className="h-3 w-3" />
+                  <Pencil className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
@@ -763,6 +832,15 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Sleek Footnote Author Attribution */}
+      <footer className="no-print w-full text-center py-6 mt-8 border-t border-slate-border/10">
+        <p className="text-[10px] uppercase tracking-widest text-slate-muted font-mono flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          <span>AURA LEDGER ENGINE</span>
+          <span className="h-1 w-1 rounded-full bg-slate-border/60 hidden sm:inline" />
+          <span>ARCHITECTED BY <span className="text-champagne font-bold">NIHAAJ AHAMED MS</span></span>
+        </p>
+      </footer>
+
       {/* SIGNATURE FLOATING ACTION BUTTON */}
       <FABModal />
 
@@ -787,8 +865,12 @@ export default function Dashboard() {
                 <h3 className="font-bold text-sm text-champagne uppercase flex items-center gap-1.5">
                   <Edit3 className="h-4 w-4" /> Edit Transaction
                 </h3>
-                <button onClick={() => setEditingTransaction(null)}>
-                  <X className="h-4 w-4 text-slate-muted hover:text-white" />
+                <button 
+                  type="button"
+                  onClick={() => setEditingTransaction(null)}
+                  className="p-2.5 text-slate-muted active:text-white transition-all active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                >
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
@@ -799,10 +881,10 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => setEditSource('hand')}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded transition-all ${
+                      className={`flex-1 py-3 text-xs font-semibold rounded transition-all min-h-[44px] active:scale-95 ${
                         editSource === 'hand'
                           ? 'bg-champagne text-obsidian font-bold shadow'
-                          : 'text-slate-muted hover:text-white'
+                          : 'text-slate-muted active:text-white'
                       }`}
                     >
                       Hand Money
@@ -810,10 +892,10 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => setEditSource('bank')}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded transition-all ${
+                      className={`flex-1 py-3 text-xs font-semibold rounded transition-all min-h-[44px] active:scale-95 ${
                         editSource === 'bank'
                           ? 'bg-champagne text-obsidian font-bold shadow'
-                          : 'text-slate-muted hover:text-white'
+                          : 'text-slate-muted active:text-white'
                       }`}
                     >
                       Bank Money
@@ -860,14 +942,16 @@ export default function Dashboard() {
 
               <div className="flex gap-2 pt-4">
                 <button
+                  type="button"
                   onClick={() => setEditingTransaction(null)}
-                  className="flex-1 border border-slate-border py-2 rounded-lg text-xs font-semibold text-slate-muted hover:text-white transition-all"
+                  className="flex-1 border border-slate-border py-3.5 rounded-lg text-xs font-semibold text-slate-muted active:text-white active:bg-white/5 transition-all active:scale-95 min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleSaveTransactionEdit}
-                  className="flex-1 bg-champagne hover:bg-champagne-light py-2 rounded-lg text-xs font-bold text-obsidian shadow-gold-glow transition-all"
+                  className="flex-1 bg-champagne py-3.5 rounded-lg text-xs font-bold text-obsidian shadow-gold-glow transition-all active:scale-95 min-h-[44px]"
                 >
                   Save Changes
                 </button>
@@ -959,14 +1043,16 @@ export default function Dashboard() {
 
               <div className="flex gap-2 pt-4">
                 <button
+                  type="button"
                   onClick={() => setShowCloseoutModal(false)}
-                  className="flex-1 border border-slate-border py-2.5 rounded-lg text-xs font-semibold text-slate-muted hover:text-white transition-all"
+                  className="flex-1 border border-slate-border py-3.5 rounded-lg text-xs font-semibold text-slate-muted active:text-white active:bg-white/5 transition-all active:scale-95 min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleConfirmCloseout}
-                  className="flex-1 bg-champagne hover:bg-champagne-light py-2.5 rounded-lg text-xs font-bold text-obsidian shadow-gold-glow transition-all"
+                  className="flex-1 bg-champagne py-3.5 rounded-lg text-xs font-bold text-obsidian shadow-gold-glow transition-all active:scale-95 min-h-[44px]"
                 >
                   Approve & Deposit
                 </button>
@@ -1130,7 +1216,7 @@ export default function Dashboard() {
                       type="text"
                       value={outflow.title}
                       onChange={(e) => handleUpdateOutflow(outflow.id, 'title', e.target.value)}
-                      className="bg-transparent border-none text-slate-muted text-[10px] block font-medium w-full focus:outline-none hover:bg-white/5 rounded focus:bg-obsidian/60 px-1 py-0.5"
+                      className="bg-transparent border-none text-slate-muted text-[10px] block font-medium w-full focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1 py-0.5"
                     />
                     <div className="flex items-center gap-1 mt-0.5">
                       <span className="text-xs text-white font-semibold font-mono">Rs.</span>
@@ -1138,16 +1224,16 @@ export default function Dashboard() {
                         type="number"
                         value={outflow.amount}
                         onChange={(e) => handleUpdateOutflow(outflow.id, 'amount', e.target.value)}
-                        className="bg-transparent border-none text-xs text-white font-semibold font-mono w-24 focus:outline-none hover:bg-white/5 rounded focus:bg-obsidian/60 px-1"
+                        className="bg-transparent border-none text-xs text-white font-semibold font-mono w-24 focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1"
                       />
                     </div>
                   </div>
                   <button 
                     onClick={() => handleToggleOutflowStatus(outflow.id)}
-                    className={`text-[9px] uppercase font-mono px-2 py-1 rounded border transition-all duration-300 ${
+                    className={`text-[9px] uppercase font-mono px-3 rounded border transition-all duration-300 min-h-[44px] min-w-[50px] flex items-center justify-center active:scale-95 ${
                       isPaid 
                         ? 'bg-emerald/10 text-emerald border-emerald/30' 
-                        : 'bg-amber/10 text-amber border-amber/30 hover:bg-emerald/5 hover:text-emerald hover:border-emerald/20'
+                        : 'bg-amber/10 text-amber border-amber/30 active:bg-emerald/5 active:text-emerald active:border-emerald/20'
                     }`}
                   >
                     {outflow.status}
@@ -1193,13 +1279,13 @@ export default function Dashboard() {
                           />
                           <button
                             onClick={() => handleSettleDebt(d.id)}
-                            className="bg-champagne text-obsidian text-[8px] font-bold px-1 py-0.5 rounded"
+                            className="bg-champagne text-obsidian text-[9px] font-bold px-3.5 rounded min-h-[44px] flex items-center justify-center active:scale-95"
                           >
                             Pay
                           </button>
                           <button
                             onClick={() => setSettlingDebtId(null)}
-                            className="text-slate-muted text-[8px] px-0.5"
+                            className="text-slate-muted text-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                           >
                             X
                           </button>
@@ -1210,7 +1296,7 @@ export default function Dashboard() {
                             setSettlingDebtId(d.id);
                             setSettleAmount(Math.abs(d.amount).toString());
                           }}
-                          className="text-[9px] uppercase font-bold text-champagne hover:underline transition-all"
+                          className="text-[9px] uppercase font-bold text-champagne active:underline transition-all min-h-[44px] px-3.5 flex items-center justify-center active:scale-95"
                         >
                           Settle
                         </button>
@@ -1303,18 +1389,18 @@ export default function Dashboard() {
                             
                             <button
                               onClick={() => handleStartEditTransaction(t)}
-                              className="opacity-0 group-hover/item:opacity-100 p-1 text-slate-muted hover:text-white transition-opacity"
+                              className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                               title="Edit transaction parameters"
                             >
-                              <Pencil className="h-3 w-3" />
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
 
                             <button
                               onClick={() => handleDeleteTransaction(t.id)}
-                              className="opacity-0 group-hover/item:opacity-100 p-1 text-slate-muted hover:text-crimson transition-opacity"
+                              className="p-2 text-slate-muted active:text-crimson transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                               title="Delete transaction"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </div>
@@ -1378,18 +1464,32 @@ export default function Dashboard() {
                     onBlur={handleSaveCycleIncome}
                     autoFocus
                   />
-                  <button onClick={handleSaveCycleIncome} className="bg-champagne p-0.5 rounded text-obsidian">
-                    <Check className="h-3 w-3" />
+                  <button 
+                    type="button"
+                    onClick={handleSaveCycleIncome}
+                    className="bg-champagne p-1.5 rounded text-obsidian active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  >
+                    <Check className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ) : (
-                <span 
-                  onDoubleClick={handleStartEditCycleIncome}
-                  className="font-mono text-xs text-white font-semibold mt-0.5 block cursor-pointer hover:text-champagne transition-colors"
-                  title="Double click to edit Base Income"
-                >
-                  Rs. {cycleBaseIncome.toLocaleString()}
-                </span>
+                <div className="flex items-center justify-center gap-1 mt-0.5">
+                  <span 
+                    onDoubleClick={handleStartEditCycleIncome}
+                    className="font-mono text-xs text-white font-semibold cursor-pointer active:text-champagne transition-colors"
+                    title="Double click to edit Base Income"
+                  >
+                    Rs. {cycleBaseIncome.toLocaleString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleStartEditCycleIncome}
+                    className="p-1.5 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                    title="Edit Base Income"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                </div>
               )}
             </div>
             <div className="bg-obsidian/40 p-2 rounded">
@@ -1437,8 +1537,9 @@ export default function Dashboard() {
                   <div key={dateStr} className="border border-slate-border/20 rounded-lg overflow-hidden bg-obsidian/20">
                     {/* Date Row Header */}
                     <button
+                      type="button"
                       onClick={() => toggleCycleDate(dateStr)}
-                      className="w-full flex justify-between items-center p-3 text-xs font-semibold hover:bg-slate-surface/20 transition-colors text-white"
+                      className="w-full flex justify-between items-center min-h-[44px] px-4 py-3 text-xs font-semibold active:bg-slate-surface/20 transition-all text-white active:scale-95"
                     >
                       <span className="font-mono">{displayDate}</span>
                       <div className="flex items-center gap-2">
@@ -1481,18 +1582,18 @@ export default function Dashboard() {
                                 
                                 <button
                                   onClick={() => handleStartEditTransaction(t)}
-                                  className="p-1 text-slate-muted hover:text-white transition-colors"
+                                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                                   title="Edit transaction"
                                 >
-                                  <Pencil className="h-3 w-3" />
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </button>
                                 
                                 <button
                                   onClick={() => handleDeleteTransaction(t.id)}
-                                  className="p-1 text-slate-muted hover:text-crimson transition-colors"
+                                  className="p-2 text-slate-muted active:text-crimson transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
                                   title="Delete transaction"
                                 >
-                                  <Trash2 className="h-3 w-3" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             </div>
@@ -1517,8 +1618,9 @@ export default function Dashboard() {
             Trigger a 10th-day cycle rollover. Sweeps remaining liquid cash (Hand Money) to savings goals and creates a new cycle period.
           </p>
           <button
+            type="button"
             onClick={handleTriggerCloseoutSimulator}
-            className="w-full bg-champagne hover:bg-champagne-light py-2 rounded text-xs font-bold text-obsidian shadow-gold-glow transition-all"
+            className="w-full bg-champagne py-3.5 rounded text-xs font-bold text-obsidian shadow-gold-glow transition-all active:scale-95 min-h-[44px]"
           >
             Simulate End of Cycle
           </button>
@@ -1624,8 +1726,9 @@ export default function Dashboard() {
         
         {/* Accordion Header */}
         <button
+          type="button"
           onClick={() => toggleMonth(monthName)}
-          className="w-full flex items-center justify-between p-3 text-xs font-semibold text-white hover:bg-white/5 transition-colors"
+          className="w-full flex items-center justify-between min-h-[44px] px-4 py-3 text-xs font-semibold text-white active:bg-white/5 transition-all active:scale-95"
         >
           <div className="flex items-center gap-1.5">
             <Calendar className="h-4 w-4 text-champagne" />
@@ -1707,7 +1810,7 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => setExpandedMonthlyDates(prev => ({ ...prev, [dateKey]: !isDateExpanded }))}
-                          className="w-full flex justify-between items-center p-2 text-[10px] hover:bg-slate-surface/20 transition-colors text-white font-medium"
+                          className="w-full flex justify-between items-center min-h-[44px] px-3 py-2.5 text-[10px] active:bg-slate-surface/20 transition-all text-white font-medium active:scale-95"
                         >
                           <span className="font-mono">{formattedDate}</span>
                           <div className="flex items-center gap-1.5">
@@ -1760,7 +1863,7 @@ export default function Dashboard() {
             {/* Print statement button */}
             <button
               onClick={() => handlePrintMonthlyStatement(monthName)}
-              className="w-full bg-slate-surface hover:bg-white/5 border border-slate-border/60 py-2 rounded text-xs font-semibold text-champagne flex items-center justify-center gap-1.5 transition-all mt-2"
+              className="w-full bg-slate-surface active:bg-white/5 border border-slate-border/60 min-h-[44px] rounded text-xs font-semibold text-champagne flex items-center justify-center gap-1.5 transition-all mt-2 active:scale-95"
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Download Statement PDF</span>
