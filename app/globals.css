@@ -21,7 +21,7 @@
   --accent-bg: #000000;
   --accent-text: #FFFFFF;
   --muted-text: #78909C;
-  --input-bg: #FFFFFF;
+  --input-bg: #ffffff;
   --input-border: rgba(120, 144, 156, 0.25);
   --input-focus-border: #1C1C1C;
   --input-focus-shadow: rgba(28, 28, 28, 0.08);
@@ -32,7 +32,7 @@
 .theme-dark {
   --background: #0F1916;
   --foreground: #E0E0E0;
-  --bg-gradient: linear-gradient(180deg, #0F1916 0%, #0F1916 100%);
+  --bg-gradient: linear-gradient(180deg, #0F1916 40%, #2d463f 60%);
   
   --surface-bg: #1B2623;
   --surface-bg-translucent: rgba(27, 38, 35, 0.4);

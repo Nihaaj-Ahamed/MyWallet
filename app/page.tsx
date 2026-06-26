@@ -1341,7 +1341,7 @@ export default function Dashboard() {
             <Landmark className="h-3 w-3" /> Master Vaults
           </div>
           <span className="text-[10px] uppercase text-slate-muted block font-semibold">Total Savings</span>
-          <span className="font-mono text-2xl md:text-3xl text-white font-bold text-gold-glow mt-1 block">
+          <span className="font-mono text-2xl md:text-3xl font-bold text-gold-glow mt-1 block">
             Rs. {savingMoney.toLocaleString()}
           </span>
         </div>
@@ -1365,12 +1365,12 @@ export default function Dashboard() {
                         className="bg-transparent border-none text-slate-muted text-[10px] block font-medium w-full focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1 py-0.5"
                       />
                       <div className="flex items-center gap-1 mt-0.5">
-                        <span className="text-xs text-white font-semibold font-mono">Rs.</span>
+                        <span className="text-xs text-charcoal dark:text-[#E0E0E0] font-semibold font-mono">Rs.</span>
                         <input
                           type="number"
                           value={outflow.amount}
                           onChange={(e) => handleUpdateOutflow(outflow.id, 'amount', e.target.value)}
-                          className="bg-transparent border-none text-xs text-white font-semibold font-mono w-24 focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1"
+                          className="bg-transparent border-none text-xs text-charcoal dark:text-[#E0E0E0] font-semibold font-mono w-24 focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1"
                         />
                       </div>
                     </div>
@@ -1462,7 +1462,7 @@ export default function Dashboard() {
                 return (
                   <div key={d.id} className="bg-obsidian/30 p-3 rounded-lg border border-slate-border/20 space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-white">{d.person_name}</span>
+                      <span className="text-xs font-semibold text-charcoal dark:text-[#E0E0E0]">{d.person_name}</span>
                       <span className={`font-mono text-xs font-semibold ${isLent ? 'text-emerald' : 'text-crimson'}`}>
                         {isLent ? '+' : '-'}Rs. {Math.abs(d.amount).toLocaleString()}
                       </span>
@@ -1496,7 +1496,7 @@ export default function Dashboard() {
                             placeholder="Amount"
                             value={settleAmount}
                             onChange={(e) => setSettleAmount(e.target.value)}
-                            className="w-24 bg-obsidian/85 text-[10px] text-white border border-slate-border/30 rounded px-1.5 py-1 focus:outline-none font-mono"
+                            className="w-24 bg-slate-50 dark:bg-[#1B2623] text-[10px] text-charcoal dark:text-[#E0E0E0] border border-slate-200 dark:border-slate-700/50 rounded px-1.5 py-1 focus:outline-none font-mono"
                           />
                         </div>
                         <div className="flex items-center gap-2">
