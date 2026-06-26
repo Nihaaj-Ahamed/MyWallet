@@ -1,19 +1,67 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
-:root {
+:root, .theme-light {
   --background: #E0F2F1;
   --foreground: #1C1C1C;
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   --font-mono: 'Plus Jakarta Sans Mono', 'Share Tech Mono', 'Courier New', Courier, monospace;
+  --bg-gradient: linear-gradient(180deg, #E0F2F1 0%, #FFFFFF 100%);
+  
+  --surface-bg: #FFFFFF;
+  --surface-bg-translucent: rgba(255, 255, 255, 0.4);
+  --surface-shadow: 0 10px 30px -5px rgba(120, 144, 156, 0.12), 0 4px 12px -2px rgba(120, 144, 156, 0.06);
+  --border-color: rgba(120, 144, 156, 0.2);
+  --card-bg-light: #F5F7F8;
+  
+  --hero-bg: #F4FF81;
+  --hero-text: #1C1C1C;
+  --hero-shadow: 0 10px 30px -5px rgba(244, 255, 129, 0.35), 0 4px 12px -2px rgba(244, 255, 129, 0.2);
+  
+  --accent-bg: #000000;
+  --accent-text: #FFFFFF;
+  --muted-text: #78909C;
+  --input-bg: #FFFFFF;
+  --input-border: rgba(120, 144, 156, 0.25);
+  --input-focus-border: #1C1C1C;
+  --input-focus-shadow: rgba(28, 28, 28, 0.08);
+  
+  --top-bar-bg: rgba(255, 255, 255, 0.7);
+}
+
+.theme-dark {
+  --background: #0F1916;
+  --foreground: #E0E0E0;
+  --bg-gradient: linear-gradient(180deg, #0F1916 0%, #0F1916 100%);
+  
+  --surface-bg: #1B2623;
+  --surface-bg-translucent: rgba(27, 38, 35, 0.4);
+  --surface-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4), 0 4px 12px -2px rgba(0, 0, 0, 0.3);
+  --border-color: rgba(77, 182, 172, 0.15);
+  --card-bg-light: #22302C;
+  
+  --hero-bg: #4DB6AC;
+  --hero-text: #0F1916;
+  --hero-shadow: 0 10px 30px -5px rgba(77, 182, 172, 0.25), 0 4px 12px -2px rgba(77, 182, 172, 0.15);
+  
+  --accent-bg: #4DB6AC;
+  --accent-text: #0F1916;
+  --muted-text: #90A4AE;
+  --input-bg: #1B2623;
+  --input-border: rgba(77, 182, 172, 0.2);
+  --input-focus-border: #4DB6AC;
+  --input-focus-shadow: rgba(77, 182, 172, 0.15);
+  
+  --top-bar-bg: rgba(15, 25, 22, 0.7);
 }
 
 body {
-  background: linear-gradient(180deg, #E0F2F1 0%, #FFFFFF 100%);
+  background: var(--bg-gradient);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
   overflow-x: hidden;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Custom Scrollbars */
@@ -23,90 +71,128 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(120, 144, 156, 0.15);
+  background: rgba(120, 144, 156, 0.1);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(120, 144, 156, 0.4);
+  background: rgba(120, 144, 156, 0.3);
   border-radius: 9999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(28, 28, 28, 0.4);
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: rgba(77, 182, 172, 0.3);
 }
 
-/* Soft Fintech Cards (Replaced Glass Panel for light theme) */
+/* Soft Cards */
 .glass-panel {
-  background: #FFFFFF !important;
+  background: var(--surface-bg) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border: none !important;
-  box-shadow: 0 10px 30px -5px rgba(120, 144, 156, 0.12), 0 4px 12px -2px rgba(120, 144, 156, 0.06) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--surface-shadow) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   border-radius: 24px !important;
-  color: #1C1C1C !important;
+  color: var(--foreground) !important;
 }
 
-.glass-panel:hover {
-  box-shadow: 0 20px 40px -10px rgba(120, 144, 156, 0.18), 0 8px 20px -5px rgba(120, 144, 156, 0.08) !important;
+/* Responsive Active Scaling instead of Hover */
+.glass-panel:active {
+  transform: scale(0.99) !important;
 }
 
 .glass-input {
-  background: #FFFFFF !important;
-  border: 1px solid rgba(120, 144, 156, 0.25) !important;
-  color: #1C1C1C !important;
+  background: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  color: var(--foreground) !important;
   border-radius: 12px !important;
   font-family: var(--font-sans) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .glass-input:focus {
   outline: none !important;
-  border-color: #1C1C1C !important;
-  box-shadow: 0 0 0 3px rgba(28, 28, 28, 0.08) !important;
-  background: #FFFFFF !important;
+  border-color: var(--input-focus-border) !important;
+  box-shadow: 0 0 0 3px var(--input-focus-shadow) !important;
+  background: var(--input-bg) !important;
 }
 
 /* Primary Bright Accent Hero Card */
 .hero-card {
-  background: #F4FF81 !important;
+  background: var(--hero-bg) !important;
   border-radius: 24px !important;
-  box-shadow: 0 10px 30px -5px rgba(244, 255, 129, 0.35), 0 4px 12px -2px rgba(244, 255, 129, 0.2) !important;
-  color: #1C1C1C !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: var(--hero-shadow) !important;
+  color: var(--hero-text) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.hero-card:hover {
-  box-shadow: 0 20px 40px -10px rgba(244, 255, 129, 0.45), 0 8px 20px -5px rgba(244, 255, 129, 0.25) !important;
+.hero-card:active {
+  transform: scale(0.99) !important;
 }
 
 /* Primary Action Buttons */
 .pill-button-primary {
-  background-color: #000000 !important;
-  color: #FFFFFF !important;
+  background-color: var(--accent-bg) !important;
+  color: var(--accent-text) !important;
   font-weight: 700 !important;
   border-radius: 9999px !important;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.pill-button-primary:hover {
-  background-color: #1C1C1C !important;
-  transform: translateY(-1px);
-}
-
 .pill-button-primary:active {
-  transform: translateY(0px) scale(0.98);
+  transform: translateY(0px) scale(0.95) !important;
 }
 
-/* Glow Text Overrides for Light Mode */
+/* Asymmetrical Top Bar Container */
+.top-bar-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  background: var(--top-bar-bg) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom-left-radius: 24px !important; /* rounded-bl-3xl is 24px */
+  border-bottom: 1px solid var(--border-color) !important;
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.3s ease !important;
+}
+
+.theme-dark .top-bar-container {
+  box-shadow: 0 4px 30px -5px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Legacy Theme Class Compatibility Mappings */
+.bg-slate-surface {
+  background-color: var(--surface-bg) !important;
+}
+.bg-slate-surface\/40 {
+  background-color: var(--surface-bg-translucent) !important;
+}
+.text-slate-muted {
+  color: var(--muted-text) !important;
+}
+.bg-obsidian-light, .bg-obsidian-light\/60, .bg-obsidian-light\/30,
+.bg-obsidian, .bg-obsidian\/30, .bg-obsidian\/85 {
+  background-color: var(--card-bg-light) !important;
+}
+.border-slate-border, .border-slate-border\/30, .border-slate-border\/50 {
+  border-color: var(--border-color) !important;
+}
+.border-slate-border\/30:active, .border-slate-border\/50:active {
+  border-color: var(--input-focus-border) !important;
+}
+
+/* Map champagne/emerald/crimson variables to accent */
+.theme-champagne, .theme-emerald, .theme-crimson {
+  --accent-color: var(--accent-bg);
+  --accent-light: var(--accent-bg);
+  --accent-dark: var(--accent-bg);
+}
+
+.shadow-gold-glow {
+  box-shadow: 0 0 15px rgba(77, 182, 172, 0.1) !important;
+}
 .text-gold-glow {
-  color: #B08E22 !important;
-  text-shadow: none !important;
-}
-
-.text-crimson-glow {
-  color: #D32F2F !important;
+  color: var(--foreground) !important;
   text-shadow: none !important;
 }
 
@@ -132,118 +218,5 @@ body {
     border: 1px solid #e2e8f0 !important;
     box-shadow: none !important;
     color: #000000 !important;
-  }
-  .text-gold-glow {
-    color: #b8860b !important;
-    text-shadow: none !important;
-  }
-  .text-crimson-glow {
-    color: #d32f2f !important;
-    text-shadow: none !important;
-  }
-}
-
-/* Multi-theme variables and overrides */
-.theme-champagne {
-  --accent-color: #D4AF37;
-  --accent-color-rgb: 212, 175, 55;
-  --accent-light: #E5C05E;
-  --accent-dark: #B08E22;
-  --accent-glow: rgba(212, 175, 55, 0.1);
-  --accent-glow-lg: rgba(212, 175, 55, 0.15);
-  --accent-glow-text: rgba(212, 175, 55, 0.2);
-}
-
-.theme-emerald {
-  --accent-color: #00B050;
-  --accent-color-rgb: 0, 176, 80;
-  --accent-light: #00E676;
-  --accent-dark: #008f3c;
-  --accent-glow: rgba(0, 176, 80, 0.1);
-  --accent-glow-lg: rgba(0, 176, 80, 0.15);
-  --accent-glow-text: rgba(0, 176, 80, 0.2);
-}
-
-.theme-crimson {
-  --accent-color: #D32F2F;
-  --accent-color-rgb: 211, 47, 47;
-  --accent-light: #FF5252;
-  --accent-dark: #b71c1c;
-  --accent-glow: rgba(211, 47, 47, 0.1);
-  --accent-glow-lg: rgba(211, 47, 47, 0.15);
-  --accent-glow-text: rgba(211, 47, 47, 0.2);
-}
-
-/* Theme Overrides dynamically mapping classes */
-.theme-emerald, .theme-crimson {
-  .text-champagne, [class*="text-champagne"] {
-    color: var(--accent-color) !important;
-  }
-  .text-champagne\/85 {
-    color: rgba(var(--accent-color-rgb), 0.85) !important;
-  }
-  
-  .bg-champagne, [class*="bg-champagne"] {
-    background-color: var(--accent-color) !important;
-  }
-  .bg-champagne\/5 {
-    background-color: rgba(var(--accent-color-rgb), 0.05) !important;
-  }
-  .bg-champagne\/10 {
-    background-color: rgba(var(--accent-color-rgb), 0.1) !important;
-  }
-  .bg-champagne\/15 {
-    background-color: rgba(var(--accent-color-rgb), 0.15) !important;
-  }
-  .bg-champagne-light {
-    background-color: var(--accent-light) !important;
-  }
-  
-  .border-champagne, [class*="border-champagne"] {
-    border-color: var(--accent-color) !important;
-  }
-  .border-champagne\/20 {
-    border-color: rgba(var(--accent-color-rgb), 0.2) !important;
-  }
-  .border-champagne\/30 {
-    border-color: rgba(var(--accent-color-rgb), 0.3) !important;
-  }
-  .border-champagne\/40 {
-    border-color: rgba(var(--accent-color-rgb), 0.4) !important;
-  }
-  
-  .hover\:border-champagne\/30:hover {
-    border-color: rgba(var(--accent-color-rgb), 0.3) !important;
-  }
-  .hover\:border-champagne\/40:hover {
-    border-color: rgba(var(--accent-color-rgb), 0.4) !important;
-  }
-  .hover\:text-champagne:hover {
-    color: var(--accent-color) !important;
-  }
-
-  .focus\:border-champagne:focus {
-    border-color: var(--accent-color) !important;
-  }
-
-  .shadow-gold-glow {
-    box-shadow: 0 0 15px var(--accent-glow) !important;
-  }
-  .shadow-gold-glow-lg, .hover\:shadow-gold-glow-lg:hover {
-    box-shadow: 0 0 25px var(--accent-glow-lg) !important;
-  }
-
-  .text-gold-glow {
-    color: var(--accent-dark) !important;
-    text-shadow: none !important;
-  }
-
-  .glass-input:focus {
-    border-color: var(--accent-color) !important;
-    box-shadow: 0 0 0 3px rgba(var(--accent-color-rgb), 0.08) !important;
-  }
-
-  .accent-champagne {
-    accent-color: var(--accent-color) !important;
   }
 }
