@@ -69,7 +69,11 @@ export default function Dashboard() {
   // Local interaction states
   const [settlingDebtId, setSettlingDebtId] = useState<string | null>(null);
   const [settleAmount, setSettleAmount] = useState('');
+  const [settleSource, setSettleSource] = useState<'hand' | 'bank'>('hand');
   
+  const [payingOutflowId, setPayingOutflowId] = useState<string | null>(null);
+  const [outflowSource, setOutflowSource] = useState<'hand' | 'bank'>('bank');
+
   const [sweepingBankId, setSweepingBankId] = useState<string | null>(null);
   const [sweepAmount, setSweepAmount] = useState('');
 
@@ -364,9 +368,46 @@ export default function Dashboard() {
   const handleSettleDebt = async (debtId: string) => {
     const amt = parseFloat(settleAmount);
     if (isNaN(amt) || amt <= 0) return;
-    await settleDebt(debtId, amt);
+    await settleDebt(debtId, amt, settleSource);
     setSettlingDebtId(null);
     setSettleAmount('');
+  };
+
+  // Fixed Outflow handlers
+  const handlePayOutflow = async (outflow: FixedOutflow) => {
+    const category = outflow.id === 'rent' ? 'Rent' : outflow.id === 'elec' ? 'Electricity' : 'General';
+    const description = `Fixed Outflow: ${outflow.title}`;
+    const date = getLocalDateString();
+    
+    await addExpense(outflow.amount, description, category, date, outflowSource);
+    
+    setOutflows(prev => prev.map(o => {
+      if (o.id === outflow.id) {
+        return { ...o, status: 'Paid' };
+      }
+      return o;
+    }));
+    setPayingOutflowId(null);
+  };
+
+  const handleUnpayOutflow = async (outflow: FixedOutflow) => {
+    if (confirm(`Are you sure you want to mark "${outflow.title}" as Pending? This will delete the logged transaction and refund the money.`)) {
+      const matchTx = transactions.find(t => 
+        t.type === 'expense' && 
+        (t.description.includes(`Fixed Outflow: ${outflow.title}`) || t.description.includes(outflow.title))
+      );
+      
+      if (matchTx) {
+        await deleteTransaction(matchTx.id);
+      }
+      
+      setOutflows(prev => prev.map(o => {
+        if (o.id === outflow.id) {
+          return { ...o, status: 'Pending' };
+        }
+        return o;
+      }));
+    }
   };
 
   // Sweep handler
@@ -1209,35 +1250,96 @@ export default function Dashboard() {
             
             {outflows.map((outflow) => {
               const isPaid = outflow.status === 'Paid';
+              const isPaying = payingOutflowId === outflow.id;
               return (
-                <div key={outflow.id} className="bg-obsidian/30 p-3 rounded-lg border border-slate-border/20 flex justify-between items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <input
-                      type="text"
-                      value={outflow.title}
-                      onChange={(e) => handleUpdateOutflow(outflow.id, 'title', e.target.value)}
-                      className="bg-transparent border-none text-slate-muted text-[10px] block font-medium w-full focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1 py-0.5"
-                    />
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-xs text-white font-semibold font-mono">Rs.</span>
+                <div key={outflow.id} className="bg-obsidian/30 p-3 rounded-lg border border-slate-border/20 space-y-2">
+                  <div className="flex justify-between items-center gap-2">
+                    <div className="flex-1 min-w-0">
                       <input
-                        type="number"
-                        value={outflow.amount}
-                        onChange={(e) => handleUpdateOutflow(outflow.id, 'amount', e.target.value)}
-                        className="bg-transparent border-none text-xs text-white font-semibold font-mono w-24 focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1"
+                        type="text"
+                        value={outflow.title}
+                        onChange={(e) => handleUpdateOutflow(outflow.id, 'title', e.target.value)}
+                        className="bg-transparent border-none text-slate-muted text-[10px] block font-medium w-full focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1 py-0.5"
                       />
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-xs text-white font-semibold font-mono">Rs.</span>
+                        <input
+                          type="number"
+                          value={outflow.amount}
+                          onChange={(e) => handleUpdateOutflow(outflow.id, 'amount', e.target.value)}
+                          className="bg-transparent border-none text-xs text-white font-semibold font-mono w-24 focus:outline-none active:bg-white/5 rounded focus:bg-obsidian/60 px-1"
+                        />
+                      </div>
                     </div>
+                    
+                    {!isPaying && (
+                      <button 
+                        onClick={() => {
+                          if (isPaid) {
+                            handleUnpayOutflow(outflow);
+                          } else {
+                            setPayingOutflowId(outflow.id);
+                            setOutflowSource('bank');
+                          }
+                        }}
+                        className={`text-[9px] uppercase font-mono px-3 rounded border transition-all duration-300 min-h-[44px] min-w-[50px] flex items-center justify-center active:scale-95 ${
+                          isPaid 
+                            ? 'bg-emerald/10 text-emerald border-emerald/30 font-bold' 
+                            : 'bg-amber/10 text-amber border-amber/30 active:bg-emerald/5 active:text-emerald active:border-emerald/20 font-bold'
+                        }`}
+                      >
+                        {outflow.status}
+                      </button>
+                    )}
                   </div>
-                  <button 
-                    onClick={() => handleToggleOutflowStatus(outflow.id)}
-                    className={`text-[9px] uppercase font-mono px-3 rounded border transition-all duration-300 min-h-[44px] min-w-[50px] flex items-center justify-center active:scale-95 ${
-                      isPaid 
-                        ? 'bg-emerald/10 text-emerald border-emerald/30' 
-                        : 'bg-amber/10 text-amber border-amber/30 active:bg-emerald/5 active:text-emerald active:border-emerald/20'
-                    }`}
-                  >
-                    {outflow.status}
-                  </button>
+
+                  {isPaying && (
+                    <div className="p-2 bg-obsidian/60 rounded border border-slate-border/30 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-[9px]">
+                        <span className="text-slate-muted font-bold uppercase">Pay Outflow From:</span>
+                        <div className="flex border border-slate-border/50 rounded bg-obsidian/30 p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setOutflowSource('hand')}
+                            className={`px-2 py-0.5 text-[8px] font-bold rounded transition-all ${
+                              outflowSource === 'hand'
+                                ? 'bg-champagne text-obsidian'
+                                : 'text-slate-muted active:text-white'
+                            }`}
+                          >
+                            Hand
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOutflowSource('bank')}
+                            className={`px-2 py-0.5 text-[8px] font-bold rounded transition-all ${
+                              outflowSource === 'bank'
+                                ? 'bg-champagne text-obsidian'
+                                : 'text-slate-muted active:text-white'
+                            }`}
+                          >
+                            Bank
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setPayingOutflowId(null)}
+                          className="text-slate-muted border border-slate-border/30 px-2.5 py-1 rounded hover:text-white active:scale-95 transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePayOutflow(outflow)}
+                          className="bg-champagne text-obsidian font-bold px-3 py-1 rounded shadow-gold-glow active:scale-95 transition-all"
+                        >
+                          Confirm Pay
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1268,33 +1370,12 @@ export default function Dashboard() {
                         {isLent ? 'Lent (Receivable)' : 'Borrowed (Payable)'}
                       </span>
                       
-                      {settlingDebtId === d.id ? (
-                        <div className="flex items-center gap-1 bg-obsidian rounded border border-slate-border/30 p-0.5">
-                          <input
-                            type="number"
-                            placeholder="Amt"
-                            value={settleAmount}
-                            onChange={(e) => setSettleAmount(e.target.value)}
-                            className="w-14 bg-transparent text-[9px] text-white focus:outline-none px-0.5"
-                          />
-                          <button
-                            onClick={() => handleSettleDebt(d.id)}
-                            className="bg-champagne text-obsidian text-[9px] font-bold px-3.5 rounded min-h-[44px] flex items-center justify-center active:scale-95"
-                          >
-                            Pay
-                          </button>
-                          <button
-                            onClick={() => setSettlingDebtId(null)}
-                            className="text-slate-muted text-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
-                          >
-                            X
-                          </button>
-                        </div>
-                      ) : (
+                      {settlingDebtId !== d.id && (
                         <button
                           onClick={() => {
                             setSettlingDebtId(d.id);
                             setSettleAmount(Math.abs(d.amount).toString());
+                            setSettleSource('hand');
                           }}
                           className="text-[9px] uppercase font-bold text-champagne active:underline transition-all min-h-[44px] px-3.5 flex items-center justify-center active:scale-95"
                         >
@@ -1302,6 +1383,64 @@ export default function Dashboard() {
                         </button>
                       )}
                     </div>
+
+                    {settlingDebtId === d.id && (
+                      <div className="mt-2 p-2 bg-obsidian/60 rounded border border-slate-border/30 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Settle Amount</label>
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            value={settleAmount}
+                            onChange={(e) => setSettleAmount(e.target.value)}
+                            className="w-24 bg-obsidian/85 text-[10px] text-white border border-slate-border/30 rounded px-1.5 py-1 focus:outline-none font-mono"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Wallet Source</label>
+                          <div className="flex border border-slate-border/50 rounded bg-obsidian/30 p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setSettleSource('hand')}
+                              className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
+                                settleSource === 'hand'
+                                  ? 'bg-champagne text-obsidian'
+                                  : 'text-slate-muted active:text-white'
+                              }`}
+                            >
+                              Hand
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSettleSource('bank')}
+                              className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
+                                settleSource === 'bank'
+                                  ? 'bg-champagne text-obsidian'
+                                  : 'text-slate-muted active:text-white'
+                              }`}
+                            >
+                              Bank
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setSettlingDebtId(null)}
+                            className="text-slate-muted text-[10px] border border-slate-border/30 px-2 py-0.5 rounded hover:text-white active:scale-95 transition-all"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSettleDebt(d.id)}
+                            className="bg-champagne text-obsidian text-[10px] font-bold px-3.5 py-0.5 rounded shadow-gold-glow active:scale-95 transition-all"
+                          >
+                            Pay
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })

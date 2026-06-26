@@ -38,7 +38,7 @@ interface WalletContextType {
   addIncome: (amount: number, description: string, startDate: string, endDate: string) => Promise<void>;
   addWithdrawal: (amount: number, date: string) => Promise<void>;
   addDebt: (amount: number, personName: string, type: 'lent' | 'borrowed', description: string) => Promise<void>;
-  settleDebt: (debtId: string, settleAmount: number) => Promise<void>;
+  settleDebt: (debtId: string, settleAmount: number, source?: 'hand' | 'bank') => Promise<void>;
   reconcileCash: (actualCash: number) => Promise<void>;
   incrementCommute: (category: 'Travel (Colombo)' | 'Travel (Home)', cost: number) => Promise<void>;
   decrementCommute: (category: 'Travel (Colombo)' | 'Travel (Home)') => Promise<void>;
@@ -400,8 +400,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveStateToLocal(cycles, transactions, updated, savings);
   };
 
-  // Settle Debt (increases Hand Money if they pay us back; decreases Hand Money if we pay them)
-  const settleDebt = async (debtId: string, settleAmount: number) => {
+  // Settle Debt (increases chosen wallet if they pay us back; decreases chosen wallet if we pay them)
+  const settleDebt = async (debtId: string, settleAmount: number, source: 'hand' | 'bank' = 'hand') => {
     const debt = debts.find(d => d.id === debtId);
     if (!debt || !activeCycle) return;
 
@@ -414,18 +414,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       amount: transAmount,
       type: isLent ? 'income' : 'expense',
       category: 'Debt Settlement',
-      description: `Settled Debt with ${debt.person_name}`,
+      description: `[${source === 'bank' ? 'Bank' : 'Hand'}] Settled Debt with ${debt.person_name}`,
       date: new Date().toISOString().split('T')[0],
       created_at: new Date().toISOString(),
     };
 
     const newDebtAmount = isLent ? debt.amount - Math.abs(settleAmount) : debt.amount + Math.abs(settleAmount);
     
-    // Adjust hand wallet
-    const currentHandObj = savings.find(s => s.id === 'wallet-hand');
-    const newHandBalance = (currentHandObj ? currentHandObj.current_balance : 15000) + transAmount;
+    // Adjust selected wallet
+    const walletId = source === 'bank' ? 'wallet-bank' : 'wallet-hand';
+    const currentWalletObj = savings.find(s => s.id === walletId);
+    const newWalletBalance = (currentWalletObj ? currentWalletObj.current_balance : 0) + transAmount;
     
-    const updatedSavings = savings.map(s => s.id === 'wallet-hand' ? { ...s, current_balance: newHandBalance } : s);
+    const updatedSavings = savings.map(s => s.id === walletId ? { ...s, current_balance: newWalletBalance } : s);
     setSavings(updatedSavings);
 
     let updatedDebts = [...debts];
@@ -446,7 +447,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         } else {
           await client.from('debts').update({ amount: newDebtAmount } as any).eq('id', debtId);
         }
-        await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand');
+        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
         await client.from('transactions').insert(settlementTransaction as any);
       } catch (err) {
         console.error("Supabase debt settlement failed:", err);
@@ -754,17 +755,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const amountAbs = Math.abs(tx.amount);
 
     if (tx.type === 'income') {
-      // Deleting an Income subtracts the amount from Bank Assets (wallet-bank)
-      const bank = savings.find(s => s.id === 'wallet-bank');
-      if (bank) {
-        const newBalance = bank.current_balance - amountAbs;
-        updatedSavings = updatedSavings.map(s => s.id === 'wallet-bank' ? { ...s, current_balance: newBalance } : s);
+      // Deleting an Income subtracts the amount from the correct wallet depending on description prefix
+      const isHand = tx.description.includes('[Hand]');
+      const walletId = isHand ? 'wallet-hand' : 'wallet-bank';
+      const wallet = savings.find(s => s.id === walletId);
+      if (wallet) {
+        const newBalance = wallet.current_balance - amountAbs;
+        updatedSavings = updatedSavings.map(s => s.id === walletId ? { ...s, current_balance: newBalance } : s);
         
         if (isSupabaseConfigured() && supabase) {
           try {
-            await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', 'wallet-bank');
+            await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', walletId);
           } catch (err) {
-            console.error("Failed to update bank balance on income delete in Supabase:", err);
+            console.error(`Failed to update ${walletId} balance on income delete in Supabase:`, err);
           }
         }
       }
