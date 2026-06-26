@@ -33,7 +33,14 @@ import {
   X,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  Coffee,
+  Car,
+  Home,
+  Zap,
+  ShoppingBag,
+  CreditCard,
+  Building2
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -509,24 +516,73 @@ export default function Dashboard() {
     );
   }
 
-  // Active grouped timeline transactions
-  const groupedTimeline = groupTransactionsByDate(activeTransactions);
+  // Helper to render transaction category avatar
+  const getTransactionAvatar = (category: string, description: string, type: string) => {
+    let bgClass = 'bg-slate-100 text-slate-500';
+    let LucideIcon = ShoppingBag;
+
+    if (type === 'income') {
+      bgClass = 'bg-emerald-100 text-emerald-700';
+      LucideIcon = ArrowDownLeft;
+    } else if (category === 'Savings Sweep' || description.includes('Sweep')) {
+      bgClass = 'bg-teal-100 text-teal-700';
+      LucideIcon = Wallet;
+    } else {
+      switch (category) {
+        case 'Food':
+          bgClass = 'bg-orange-100 text-orange-600';
+          LucideIcon = Coffee;
+          break;
+        case 'Travel (Colombo)':
+          bgClass = 'bg-blue-100 text-blue-600';
+          LucideIcon = Car;
+          break;
+        case 'Travel (Home)':
+          bgClass = 'bg-indigo-100 text-indigo-600';
+          LucideIcon = Home;
+          break;
+        case 'Rent':
+          bgClass = 'bg-purple-100 text-purple-600';
+          LucideIcon = Building2;
+          break;
+        case 'Electricity':
+          bgClass = 'bg-yellow-100 text-yellow-600';
+          LucideIcon = Zap;
+          break;
+        default:
+          if (description.toLowerCase().includes('withdrawal') || description.toLowerCase().includes('withdraw')) {
+            bgClass = 'bg-amber-100 text-amber-600';
+            LucideIcon = CreditCard;
+          } else {
+            bgClass = 'bg-slate-100 text-slate-600';
+            LucideIcon = ShoppingBag;
+          }
+          break;
+      }
+    }
+
+    return (
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${bgClass}`}>
+        <LucideIcon className="h-5 w-5" strokeWidth={1.75} />
+      </div>
+    );
+  };
 
   return (
-    <main className={`min-h-screen bg-obsidian text-slate-muted pb-24 print:pb-0 theme-${theme}`}>
+    <main className={`min-h-screen bg-transparent text-charcoal pb-32 print:pb-0 theme-${theme}`}>
       
       {/* HEADER NAVIGATION */}
-      <header className="no-print sticky top-0 z-35 bg-obsidian/95 backdrop-blur-md border-b border-slate-border/50 px-4 py-4 md:px-8 max-w-7xl mx-auto flex flex-col gap-4">
+      <header className="no-print sticky top-0 z-35 bg-transparent px-4 py-6 md:px-8 max-w-7xl mx-auto flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-champagne/10 border border-champagne/30 text-champagne shadow-gold-glow overflow-hidden">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-slate-200/50 shadow-sm overflow-hidden">
               <img src="/logo.png" alt="MyWallet Logo" className="h-6 w-6 object-contain" />
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight text-white uppercase flex items-center gap-1.5">
-                MyWallet<span className="text-[9px] bg-champagne/15 text-champagne border border-champagne/30 px-2 py-0.5 rounded font-mono">NIHAAJ_AHAMED MS</span>
+              <h1 className="text-base font-extrabold tracking-tight text-charcoal uppercase flex items-center gap-1.5">
+                MyWallet<span className="text-[9px] bg-charcoal/10 text-charcoal border border-charcoal/20 px-2 py-0.5 rounded font-mono font-bold">NIHAAJ_AHAMED MS</span>
               </h1>
-              <p className="text-[10px] text-slate-muted">High-End Liquid Wealth & Commute Tracker</p>
+              <p className="text-[10px] text-sage font-medium">High-End Liquid Wealth & Commute Tracker</p>
             </div>
           </div>
 
@@ -538,255 +594,229 @@ export default function Dashboard() {
                 const nextTheme = theme === 'champagne' ? 'emerald' : theme === 'emerald' ? 'crimson' : 'champagne';
                 setTheme(nextTheme);
               }}
-              className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-lg bg-obsidian-light/80 border border-slate-border/50 transition-all active:scale-95"
+              className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-white hover:bg-slate-50 border border-slate-200/50 shadow-sm transition-all active:scale-95 cursor-pointer"
               title={`Active Accent: ${theme.charAt(0).toUpperCase() + theme.slice(1)}. Tap to change.`}
             >
               <div 
-                className="w-3.5 h-3.5 rounded-full transition-all duration-300 ring-2 ring-white/20"
+                className="w-3.5 h-3.5 rounded-full transition-all duration-300 ring-2 ring-slate-100"
                 style={{
                   backgroundColor: theme === 'champagne' ? '#D4AF37' : theme === 'emerald' ? '#00E676' : '#FF5252'
                 }}
               />
             </button>
+          </div>
+        </div>
+      </header>
 
-            {/* Shutter Eye Privacy Toggle */}
+      {/* COMBINATION NET WORTH PANEL (HERO CARD) */}
+      <div className="no-print max-w-7xl mx-auto px-4 md:px-8 mt-4">
+        <section className="hero-card relative overflow-hidden p-6 md:p-8 flex flex-col justify-between min-h-[140px]">
+          <div className="flex justify-between items-start w-full">
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-widest text-charcoal/60 font-bold flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-charcoal/70" strokeWidth={1.75} />
+                Combined Net Worth
+              </p>
+              <h2 className={`text-4xl md:text-5xl font-extrabold tracking-tight text-charcoal transition-all duration-300 mt-2 ${isBlurred ? 'privacy-blur' : ''}`}>
+                Rs. {netWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h2>
+            </div>
+            
             <button
               type="button"
               onClick={() => setIsBlurred(prev => !prev)}
-              className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-lg bg-obsidian-light/80 border border-slate-border/50 text-slate-muted active:text-white transition-all active:scale-95"
+              className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-white/60 hover:bg-white/95 text-charcoal shadow-sm active:scale-90 transition-all cursor-pointer"
               title={isBlurred ? "Show monetary values" : "Blur monetary values"}
             >
-              {isBlurred ? <EyeOff className="h-5 w-5 text-champagne" /> : <Eye className="h-5 w-5 text-slate-muted" />}
+              {isBlurred ? <EyeOff className="h-5 w-5" strokeWidth={1.75} /> : <Eye className="h-5 w-5" strokeWidth={1.75} />}
             </button>
           </div>
-        </div>
-
-        {/* Persistent Tab Switcher (Mobile Tab Switcher) */}
-        <nav className="lg:hidden flex border border-slate-border/30 p-1 bg-obsidian-light/50 rounded-lg">
-          {[
-            { id: 0, label: 'Vault & Trust', icon: Landmark },
-            { id: 1, label: 'Today Ledger', icon: Calendar },
-            { id: 2, label: '10-Day Cycles', icon: Sparkles },
-            { id: 3, label: 'Monthly History', icon: FileText }
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeMobileTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveMobileTab(tab.id)}
-                className={`flex-1 flex flex-col items-center justify-center min-h-[44px] py-2 rounded-md text-[9px] font-medium transition-all active:scale-95 ${
-                  isActive
-                    ? 'bg-champagne/15 text-champagne border border-champagne/30 font-bold'
-                    : 'text-slate-muted active:text-white'
-                }`}
-              >
-                <Icon className="h-4 w-4 mb-0.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </header>
-
-      {/* COMBINATION NET WORTH PANEL */}
-      <div className="no-print max-w-7xl mx-auto px-4 md:px-8 mt-6">
-        <section className="glass-panel relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-surface/90 to-obsidian-light p-6 md:p-8 text-center border border-slate-border">
-          <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-72 h-72 bg-champagne/10 blur-[90px] rounded-full pointer-events-none" />
-          
-          <p className="text-xs uppercase tracking-widest text-slate-muted font-bold flex items-center justify-center gap-1">
-            <Sparkles className="h-3.5 w-3.5 text-champagne" /> Combined Net Worth <Sparkles className="h-3.5 w-3.5 text-champagne" />
-          </p>
-          
-          <h2 className={`mt-2 text-4xl md:text-5xl font-mono font-bold tracking-tight text-champagne text-gold-glow transition-all duration-300 ${isBlurred ? 'privacy-blur' : ''}`}>
-            Rs. {netWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h2>
         </section>
       </div>
 
       {/* 4 QUADRANT WALLET ARCHITECTURE (CORE LIQUIDITY BLOCKS) */}
       <div className="no-print max-w-7xl mx-auto px-4 md:px-8 mt-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           
           {/* 1. BANK MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Bank Money</span>
-              <Landmark className="h-4 w-4 text-champagne" />
+              <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Bank Money</span>
+              <Landmark className="h-5 w-5 text-sage" strokeWidth={1.75} />
             </div>
             
             {editingWalletId === 'wallet-bank' ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 mt-2">
                 <input
                   type="number"
                   value={editingWalletValue}
                   onChange={(e) => setEditingWalletValue(e.target.value)}
-                  className="bg-obsidian/60 border border-champagne/40 rounded px-2 py-1 text-sm font-mono text-white focus:outline-none w-full"
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm font-sans font-bold text-charcoal focus:outline-none w-full"
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveWalletOverride('wallet-bank')}
                   autoFocus
                 />
-                <button onClick={() => handleSaveWalletOverride('wallet-bank')} className="bg-champagne p-1 rounded text-obsidian">
-                  <Check className="h-3.5 w-3.5" />
+                <button onClick={() => handleSaveWalletOverride('wallet-bank')} className="bg-charcoal p-1.5 rounded-lg text-white cursor-pointer active:scale-90 transition-all">
+                  <Check className="h-4 w-4" strokeWidth={2} />
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline justify-between mt-2">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer hover:text-sage transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {bankMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                  className="p-2 text-sage hover:text-charcoal transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[9px] text-slate-muted mt-1 leading-none">Auto-updates on Incomes & Bank Expenses</p>
+            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Auto-updates on Incomes & Bank Expenses</p>
           </div>
 
           {/* 2. LIQUID / HAND MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Hand Money</span>
-              <Coins className="h-4 w-4 text-champagne" />
+              <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Hand Money</span>
+              <Coins className="h-5 w-5 text-sage" strokeWidth={1.75} />
             </div>
             
             {editingWalletId === 'wallet-hand' ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 mt-2">
                 <input
                   type="number"
                   value={editingWalletValue}
                   onChange={(e) => setEditingWalletValue(e.target.value)}
-                  className="bg-obsidian/60 border border-champagne/40 rounded px-2 py-1 text-sm font-mono text-white focus:outline-none w-full"
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm font-sans font-bold text-charcoal focus:outline-none w-full"
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveWalletOverride('wallet-hand')}
                   autoFocus
                 />
-                <button onClick={() => handleSaveWalletOverride('wallet-hand')} className="bg-champagne p-1 rounded text-obsidian">
-                  <Check className="h-3.5 w-3.5" />
+                <button onClick={() => handleSaveWalletOverride('wallet-hand')} className="bg-charcoal p-1.5 rounded-lg text-white cursor-pointer active:scale-90 transition-all">
+                  <Check className="h-4 w-4" strokeWidth={2} />
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline justify-between mt-2">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer hover:text-sage transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {handMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                  className="p-2 text-sage hover:text-charcoal transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[9px] text-slate-muted mt-1 leading-none">Primary cash wallet for daily hand expenses</p>
+            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Primary cash wallet for daily hand expenses</p>
           </div>
 
           {/* 3. SAVING MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Saving Money</span>
-              <Wallet className="h-4 w-4 text-champagne" />
+              <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Saving Money</span>
+              <Wallet className="h-5 w-5 text-sage" strokeWidth={1.75} />
             </div>
             
             {editingWalletId === 'wallet-savings' ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 mt-2">
                 <input
                   type="number"
                   value={editingWalletValue}
                   onChange={(e) => setEditingWalletValue(e.target.value)}
-                  className="bg-obsidian/60 border border-champagne/40 rounded px-2 py-1 text-sm font-mono text-white focus:outline-none w-full"
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm font-sans font-bold text-charcoal focus:outline-none w-full"
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveWalletOverride('s-1')}
                   autoFocus
                 />
-                <button onClick={() => handleSaveWalletOverride('s-1')} className="bg-champagne p-1 rounded text-obsidian">
-                  <Check className="h-3.5 w-3.5" />
+                <button onClick={() => handleSaveWalletOverride('s-1')} className="bg-charcoal p-1.5 rounded-lg text-white cursor-pointer active:scale-90 transition-all">
+                  <Check className="h-4 w-4" strokeWidth={2} />
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline justify-between mt-2">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
-                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer hover:text-sage transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {savingMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
-                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                  className="p-2 text-sage hover:text-charcoal transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[9px] text-slate-muted mt-1 leading-none">Accumulated vaults swept from cycles</p>
+            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Accumulated vaults swept from cycles</p>
           </div>
 
           {/* 4. OPTION MONEY */}
-          <div className="glass-panel bg-slate-surface/40 p-4 rounded-xl border border-slate-border/50 flex flex-col justify-between relative group active:border-champagne/30 transition-all duration-300">
+          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-muted">Option Money</span>
-              <div className="flex gap-1.5 items-center">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Option Money</span>
+              <div className="flex gap-1 items-center">
                 <button 
                   type="button"
                   onClick={() => handleStepOptionMoney('dec')}
-                  className="bg-obsidian border border-slate-border/30 h-11 w-11 min-h-[44px] min-w-[44px] rounded flex items-center justify-center text-slate-muted active:text-white active:scale-95"
+                  className="bg-slate-100 hover:bg-slate-200 border-none h-9 w-9 min-h-[36px] min-w-[36px] rounded-full flex items-center justify-center text-charcoal transition-all active:scale-90 cursor-pointer"
                   title="Subtract Rs. 1,000"
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-4 w-4" strokeWidth={2} />
                 </button>
                 <button 
                   type="button"
                   onClick={() => handleStepOptionMoney('inc')}
-                  className="bg-obsidian border border-slate-border/30 h-11 w-11 min-h-[44px] min-w-[44px] rounded flex items-center justify-center text-slate-muted active:text-white active:scale-95"
+                  className="bg-slate-100 hover:bg-slate-200 border-none h-9 w-9 min-h-[36px] min-w-[36px] rounded-full flex items-center justify-center text-charcoal transition-all active:scale-90 cursor-pointer"
                   title="Add Rs. 1,000"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4" strokeWidth={2} />
                 </button>
               </div>
             </div>
             
             {editingWalletId === 'wallet-option' ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 mt-2">
                 <input
                   type="number"
                   value={editingWalletValue}
                   onChange={(e) => setEditingWalletValue(e.target.value)}
-                  className="bg-obsidian/60 border border-champagne/40 rounded px-2 py-1 text-sm font-mono text-white focus:outline-none w-full"
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-sm font-sans font-bold text-charcoal focus:outline-none w-full"
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveWalletOverride('wallet-option')}
                   autoFocus
                 />
-                <button onClick={() => handleSaveWalletOverride('wallet-option')} className="bg-champagne p-1 rounded text-obsidian">
-                  <Check className="h-3.5 w-3.5" />
+                <button onClick={() => handleSaveWalletOverride('wallet-option')} className="bg-charcoal p-1.5 rounded-lg text-white cursor-pointer active:scale-90 transition-all">
+                  <Check className="h-4 w-4" strokeWidth={2} />
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline justify-between mt-2">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-option', optionMoney)}
-                  className={`text-lg md:text-xl font-mono font-bold text-white tracking-tight cursor-pointer active:text-champagne transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer hover:text-sage transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {optionMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-option', optionMoney)}
-                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                  className="p-2 text-sage hover:text-charcoal transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[9px] text-slate-muted mt-1 leading-none">Independent steerable ledger balance</p>
+            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Independent steerable ledger balance</p>
           </div>
 
         </div>
@@ -881,6 +911,74 @@ export default function Dashboard() {
           <span>ARCHITECTED BY <span className="text-champagne font-bold">NIHAAJ AHAMED MS</span></span>
         </p>
       </footer>
+
+      {/* MOBILE FLOATING BOTTOM DOCK NAVIGATION */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lg:hidden no-print w-[90%] max-w-sm">
+        <div className="bg-white/95 backdrop-blur-md rounded-full px-5 py-3 shadow-lg border border-slate-100 flex items-center justify-between gap-2">
+          {/* Tab 0: Vault (Landmark Icon) */}
+          <button
+            onClick={() => setActiveMobileTab(0)}
+            className={`p-2.5 rounded-full transition-all duration-200 cursor-pointer ${
+              activeMobileTab === 0 
+                ? 'bg-black text-white scale-110 shadow-sm' 
+                : 'text-sage hover:text-charcoal hover:bg-slate-50'
+            }`}
+            title="Vault & Trust"
+          >
+            <Landmark className="h-5 w-5" strokeWidth={activeMobileTab === 0 ? 2 : 1.75} />
+          </button>
+
+          {/* Tab 1: Today (Calendar Icon) */}
+          <button
+            onClick={() => setActiveMobileTab(1)}
+            className={`p-2.5 rounded-full transition-all duration-200 cursor-pointer ${
+              activeMobileTab === 1 
+                ? 'bg-black text-white scale-110 shadow-sm' 
+                : 'text-sage hover:text-charcoal hover:bg-slate-50'
+            }`}
+            title="Today Ledger"
+          >
+            <Calendar className="h-5 w-5" strokeWidth={activeMobileTab === 1 ? 2 : 1.75} />
+          </button>
+
+          {/* Center FAB Plus Button */}
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('open-fab-modal'));
+            }}
+            className="w-12 h-12 bg-black hover:bg-charcoal text-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all transform active:scale-95 cursor-pointer -translate-y-4 border-4 border-white"
+            title="Add Ledger Entry"
+          >
+            <Plus className="h-6 w-6 text-white" strokeWidth={2.5} />
+          </button>
+
+          {/* Tab 2: Cycles (Sparkles Icon) */}
+          <button
+            onClick={() => setActiveMobileTab(2)}
+            className={`p-2.5 rounded-full transition-all duration-200 cursor-pointer ${
+              activeMobileTab === 2 
+                ? 'bg-black text-white scale-110 shadow-sm' 
+                : 'text-sage hover:text-charcoal hover:bg-slate-50'
+            }`}
+            title="10-Day Cycles"
+          >
+            <Sparkles className="h-5 w-5" strokeWidth={activeMobileTab === 2 ? 2 : 1.75} />
+          </button>
+
+          {/* Tab 3: History (FileText Icon) */}
+          <button
+            onClick={() => setActiveMobileTab(3)}
+            className={`p-2.5 rounded-full transition-all duration-200 cursor-pointer ${
+              activeMobileTab === 3 
+                ? 'bg-black text-white scale-110 shadow-sm' 
+                : 'text-sage hover:text-charcoal hover:bg-slate-50'
+            }`}
+            title="Monthly History"
+          >
+            <FileText className="h-5 w-5" strokeWidth={activeMobileTab === 3 ? 2 : 1.75} />
+          </button>
+        </div>
+      </div>
 
       {/* SIGNATURE FLOATING ACTION BUTTON */}
       <FABModal />
@@ -1156,7 +1254,7 @@ export default function Dashboard() {
                   <span>Rs. {printExpenses.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-xs font-mono">
-                  <span>Deposited to Savings:</span>THE
+                  <span>Deposited to Savings:</span>
                   <span>Rs. {printSweeps.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-xs font-mono border-t border-black pt-1 font-bold">
@@ -1459,10 +1557,10 @@ export default function Dashboard() {
     const groupedTimelineToday = groupTransactionsByDate(todayTransactions);
 
     return (
-      <div className="glass-panel rounded-xl bg-slate-surface/40 border border-slate-border p-5 space-y-4">
+      <div className="glass-panel p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold tracking-wider uppercase text-white">Today Ledger</h3>
-          <span className="text-[10px] text-slate-muted font-mono bg-obsidian px-2 py-0.5 rounded border border-slate-border/40">
+          <h3 className="text-xs font-bold tracking-wider uppercase text-charcoal">Today Ledger</h3>
+          <span className="text-[9px] text-sage font-bold bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/50">
             Archived Daily Streams
           </span>
         </div>
@@ -1470,23 +1568,22 @@ export default function Dashboard() {
         {/* Date Grouped Timeline container */}
         <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1">
           {todayTransactions.length === 0 ? (
-            <p className="text-xs text-slate-muted italic text-center py-8">No ledger entries logged today</p>
+            <p className="text-xs text-sage italic text-center py-10">No ledger entries logged today</p>
           ) : (
             Object.entries(groupedTimelineToday).map(([dateStr, items]) => {
               const dailyTotal = calculateDailyTotal(items);
               return (
-                <div key={dateStr} className="space-y-2">
+                <div key={dateStr} className="space-y-3">
                   {/* Daily Subheader */}
-                  <div className="flex justify-between items-center bg-obsidian-light/30 px-3 py-1.5 rounded border-l-2 border-champagne text-xs font-semibold">
-                    <span className="text-white">{dateStr}</span>
-                    <span className="font-mono text-slate-muted">Total spent: Rs. {dailyTotal.toLocaleString()}</span>
+                  <div className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border-l-4 border-champagne text-xs font-bold">
+                    <span className="text-charcoal">{dateStr}</span>
+                    <span className="text-sage">Total spent: <span className="text-charcoal font-bold">Rs. {dailyTotal.toLocaleString()}</span></span>
                   </div>
 
                   {/* Transactions listed under day */}
-                  <div className="space-y-1.5 pl-1.5">
+                  <div className="space-y-2 pl-1">
                     {items.map(t => {
                       const isExpense = t.type === 'expense';
-                      const isCommute = t.category.includes('Travel');
                       const isBank = t.description.startsWith('[Bank]');
                       
                       // Remove prefix to clean rendering description
@@ -1497,49 +1594,46 @@ export default function Dashboard() {
                       return (
                         <div 
                           key={t.id} 
-                          className="flex justify-between items-center p-2.5 rounded bg-obsidian/10 border border-slate-border/20 hover:border-champagne/10 transition-colors group/item"
+                          className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 hover:border-slate-200/80 hover:shadow-sm transition-all duration-200 group/item"
                         >
-                          <div className="min-w-0 pr-2">
-                            <div className="flex items-center gap-1">
-                              <span className={`text-[7px] uppercase font-mono px-1 py-0.2 rounded font-bold ${
+                          {/* Avatar icon */}
+                          {getTransactionAvatar(t.category, t.description, t.type)}
+
+                          {/* Middle content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full font-bold ${
                                 isBank 
-                                  ? 'border border-blue-500/40 text-blue-400 bg-blue-500/5' 
-                                  : 'border border-amber-500/40 text-amber-400 bg-amber-500/5'
+                                  ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
+                                  : 'bg-amber-50 text-amber-600 border border-amber-100/50'
                               }`}>
                                 {isBank ? 'Bank' : 'Hand'}
                               </span>
-                              <span className={`text-[8px] uppercase font-mono px-1 py-0.5 rounded ${
-                                isCommute 
-                                  ? t.category.includes('Colombo') 
-                                    ? 'border border-champagne/40 text-champagne bg-champagne/5 font-semibold'
-                                    : 'border border-crimson/40 text-crimson bg-crimson/5 font-semibold'
-                                  : 'bg-slate-surface text-slate-muted'
-                              }`}>
-                                {t.category}
-                              </span>
+                              <span className="text-[9px] text-sage font-semibold">{t.category}</span>
                             </div>
-                            <p className="text-xs font-medium text-white mt-1">{descClean}</p>
+                            <p className="text-xs font-semibold text-charcoal mt-1 leading-tight">{descClean}</p>
                           </div>
                           
-                          <div className="flex items-center gap-2">
-                            <span className={`font-mono text-xs font-semibold ${isExpense ? 'text-crimson' : 'text-emerald'}`}>
+                          {/* Right side actions and amount */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className={`font-sans text-xs font-black mr-2 ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>
                               {isExpense ? '-' : '+'}Rs. {Math.abs(t.amount).toLocaleString()}
                             </span>
                             
                             <button
                               onClick={() => handleStartEditTransaction(t)}
-                              className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                              className="p-1.5 text-sage hover:text-charcoal hover:bg-slate-100 rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
                               title="Edit transaction parameters"
                             >
-                              <Pencil className="h-3.5 w-3.5" />
+                              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
                             </button>
 
                             <button
                               onClick={() => handleDeleteTransaction(t.id)}
-                              className="p-2 text-slate-muted active:text-crimson transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                              className="p-1.5 text-sage hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
                               title="Delete transaction"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                             </button>
                           </div>
                         </div>
@@ -1577,28 +1671,28 @@ export default function Dashboard() {
     };
 
     return (
-      <div className="glass-panel rounded-xl bg-slate-surface/40 border border-slate-border p-5 space-y-4">
+      <div className="glass-panel p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold tracking-wider uppercase text-white font-bold">10-Day Cycles</h3>
+          <h3 className="text-xs font-bold tracking-wider uppercase text-charcoal">10-Day Cycles</h3>
           {activeCycle && (
-            <span className="text-[10px] font-mono text-champagne bg-champagne/10 border border-champagne/20 px-2 py-0.5 rounded">
+            <span className="text-[9px] font-bold text-champagne bg-champagne/10 border border-champagne/20 px-2.5 py-1 rounded-full">
               Active Sprint
             </span>
           )}
         </div>
 
         {/* Metrics Grid */}
-        <div className="space-y-3 bg-obsidian/30 p-4 rounded-lg border border-slate-border/20">
-          <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-            <div className="bg-obsidian/40 p-2 rounded relative group/income">
-              <span className="text-slate-muted block font-medium">Base Income</span>
+        <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
+          <div className="grid grid-cols-3 gap-3 text-center text-[10px]">
+            <div className="bg-white border border-slate-100 p-2.5 rounded-xl relative group/income shadow-sm">
+              <span className="text-sage block font-bold uppercase tracking-wider text-[8px] mb-1">Base Income</span>
               {editingCycleIncome ? (
-                <div className="flex items-center gap-1 mt-0.5 justify-center">
+                <div className="flex items-center gap-1.5 mt-1 justify-center">
                   <input
                     type="number"
                     value={cycleIncomeValue}
                     onChange={(e) => setCycleIncomeValue(e.target.value)}
-                    className="bg-obsidian/60 border border-champagne/40 rounded px-1 py-0.5 text-xs font-mono text-white text-center focus:outline-none w-20"
+                    className="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-xs font-sans font-bold text-charcoal text-center focus:outline-none w-20"
                     onKeyDown={(e) => e.key === 'Enter' && handleSaveCycleIncome()}
                     onBlur={handleSaveCycleIncome}
                     autoFocus
@@ -1606,16 +1700,16 @@ export default function Dashboard() {
                   <button 
                     type="button"
                     onClick={handleSaveCycleIncome}
-                    className="bg-champagne p-1.5 rounded text-obsidian active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="bg-charcoal p-1 rounded-lg text-white active:scale-95 flex items-center justify-center cursor-pointer"
                   >
-                    <Check className="h-3.5 w-3.5" />
+                    <Check className="h-3 w-3" strokeWidth={2} />
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-1 mt-0.5">
+                <div className="flex items-center justify-center gap-1 mt-1">
                   <span 
                     onDoubleClick={handleStartEditCycleIncome}
-                    className="font-mono text-xs text-white font-semibold cursor-pointer active:text-champagne transition-colors"
+                    className="font-sans text-xs text-charcoal font-extrabold cursor-pointer hover:text-sage transition-colors"
                     title="Double click to edit Base Income"
                   >
                     Rs. {cycleBaseIncome.toLocaleString()}
@@ -1623,33 +1717,33 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={handleStartEditCycleIncome}
-                    className="p-1.5 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                    className="p-1 text-sage hover:text-charcoal transition-colors flex items-center justify-center active:scale-95 cursor-pointer"
                     title="Edit Base Income"
                   >
-                    <Pencil className="h-3 w-3" />
+                    <Pencil className="h-3 w-3" strokeWidth={1.5} />
                   </button>
                 </div>
               )}
             </div>
-            <div className="bg-obsidian/40 p-2 rounded">
-              <span className="text-slate-muted block font-medium">Total Spent</span>
-              <span className="font-mono text-xs text-crimson font-semibold mt-0.5 block">Rs. {cycleExpenses.toLocaleString()}</span>
+            <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
+              <span className="text-sage block font-bold uppercase tracking-wider text-[8px] mb-1">Total Spent</span>
+              <span className="font-sans text-xs text-rose-500 font-extrabold mt-1.5 block">Rs. {cycleExpenses.toLocaleString()}</span>
             </div>
-            <div className="bg-obsidian/40 p-2 rounded">
-              <span className="text-slate-muted block font-medium">Remaining</span>
-              <span className="font-mono text-xs text-champagne font-semibold mt-0.5 block">Rs. {remainingCycleBalance.toLocaleString()}</span>
+            <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
+              <span className="text-sage block font-bold uppercase tracking-wider text-[8px] mb-1">Remaining</span>
+              <span className="font-sans text-xs text-charcoal font-extrabold mt-1.5 block">Rs. {remainingCycleBalance.toLocaleString()}</span>
             </div>
           </div>
 
           {/* Progress bar */}
           <div className="space-y-1">
-            <div className="flex justify-between text-[9px] font-mono text-slate-muted">
+            <div className="flex justify-between text-[9px] text-sage font-bold uppercase tracking-wider">
               <span>Sprint Budget Exhaustion</span>
               <span>{expensePercent.toFixed(0)}%</span>
             </div>
-            <div className="h-1.5 w-full bg-obsidian rounded-full overflow-hidden border border-slate-border/30">
+            <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-crimson to-champagne transition-all duration-500" 
+                className="h-full bg-gradient-to-r from-rose-400 to-amber-400 transition-all duration-500 rounded-full" 
                 style={{ width: `${Math.min(expensePercent, 100)}%` }} 
               />
             </div>
@@ -1657,10 +1751,10 @@ export default function Dashboard() {
         </div>
 
         {/* Dynamic Daily Spent Accordions */}
-        <div className="space-y-2 mt-4">
-          <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-muted font-semibold">Daily Spent Ledger</h4>
+        <div className="space-y-3 mt-4">
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-sage">Daily Spent Ledger</h4>
           {sortedCycleDates.length === 0 ? (
-            <p className="text-xs text-slate-muted italic text-center py-4 bg-obsidian/20 rounded">No transactions logged in this cycle</p>
+            <p className="text-xs text-sage italic text-center py-6 bg-slate-50 border border-slate-100 rounded-2xl">No transactions logged in this cycle</p>
           ) : (
             <div className="space-y-2">
               {sortedCycleDates.map(dateStr => {
@@ -1673,23 +1767,23 @@ export default function Dashboard() {
                 const displayDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 
                 return (
-                  <div key={dateStr} className="border border-slate-border/20 rounded-lg overflow-hidden bg-obsidian/20">
+                  <div key={dateStr} className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm transition-all duration-200">
                     {/* Date Row Header */}
                     <button
                       type="button"
                       onClick={() => toggleCycleDate(dateStr)}
-                      className="w-full flex justify-between items-center min-h-[44px] px-4 py-3 text-xs font-semibold active:bg-slate-surface/20 transition-all text-white active:scale-95"
+                      className="w-full flex justify-between items-center min-h-[48px] px-4 py-3 text-xs font-bold hover:bg-slate-50 transition-all text-charcoal active:scale-[0.99] cursor-pointer"
                     >
-                      <span className="font-mono">{displayDate}</span>
+                      <span>{displayDate}</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-slate-muted">Total Spent Rs. {dailySpent.toLocaleString()}</span>
-                        <ChevronDown className={`h-4 w-4 text-slate-muted transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                        <span className="text-sage">Spent: <span className="text-charcoal font-bold">Rs. {dailySpent.toLocaleString()}</span></span>
+                        <ChevronDown className={`h-4 w-4 text-sage transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} strokeWidth={2} />
                       </div>
                     </button>
 
                     {/* Expandable Panel */}
                     {isExpanded && (
-                      <div className="border-t border-slate-border/20 p-2.5 space-y-2 bg-obsidian-light/10">
+                      <div className="border-t border-slate-100 p-3 space-y-3 bg-slate-50/50">
                         {items.map(t => {
                           const isExpense = t.type === 'expense';
                           const isBank = t.description.startsWith('[Bank]');
@@ -1699,40 +1793,48 @@ export default function Dashboard() {
                           if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
 
                           return (
-                            <div key={t.id} className="flex justify-between items-center p-2 rounded bg-obsidian/30 border border-slate-border/10 text-xs">
-                              <div className="min-w-0 pr-2">
+                            <div 
+                              key={t.id} 
+                              className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 hover:border-slate-200/80 hover:shadow-sm transition-all duration-200 group/item text-left"
+                            >
+                              {/* Avatar */}
+                              {getTransactionAvatar(t.category, t.description, t.type)}
+
+                              {/* Details */}
+                              <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className={`text-[8px] uppercase font-mono px-1 py-0.2 rounded font-bold ${
+                                  <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full font-bold ${
                                     isBank 
-                                      ? 'border border-blue-500/40 text-blue-400 bg-blue-500/5' 
-                                      : 'border border-amber-500/40 text-amber-400 bg-amber-500/5'
+                                      ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
+                                      : 'bg-amber-50 text-amber-600 border border-amber-100/50'
                                   }`}>
                                     {isBank ? 'Bank' : 'Hand'}
                                   </span>
-                                  <span className="text-[9px] text-slate-muted font-semibold">{t.category}</span>
+                                  <span className="text-[9px] text-sage font-semibold">{t.category}</span>
                                 </div>
-                                <p className="text-white mt-1 font-medium">{descClean}</p>
+                                <p className="text-xs font-semibold text-charcoal mt-1 leading-tight">{descClean}</p>
                               </div>
                               
-                              <div className="flex items-center gap-2">
-                                <span className={`font-mono font-semibold ${isExpense ? 'text-crimson' : 'text-emerald'}`}>
+                              {/* Amount & Actions */}
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <span className={`font-sans text-xs font-black mr-2 ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>
                                   {isExpense ? '-' : '+'}Rs. {Math.abs(t.amount).toLocaleString()}
                                 </span>
                                 
                                 <button
                                   onClick={() => handleStartEditTransaction(t)}
-                                  className="p-2 text-slate-muted active:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                                  className="p-1.5 text-sage hover:text-charcoal hover:bg-slate-100 rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
                                   title="Edit transaction"
                                 >
-                                  <Pencil className="h-3.5 w-3.5" />
+                                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
                                 </button>
                                 
                                 <button
                                   onClick={() => handleDeleteTransaction(t.id)}
-                                  className="p-2 text-slate-muted active:text-crimson transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+                                  className="p-1.5 text-sage hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
                                   title="Delete transaction"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                                 </button>
                               </div>
                             </div>
@@ -1748,18 +1850,18 @@ export default function Dashboard() {
         </div>
 
         {/* Closeout Simulation Trigger */}
-        <div className="bg-gradient-to-r from-champagne/10 to-transparent p-4 rounded-lg border border-champagne/20 space-y-2">
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100/50 space-y-3">
           <div className="flex items-center gap-1.5">
-            <Sparkles className="h-4.5 w-4.5 text-champagne" />
-            <span className="text-xs font-semibold text-white">End-of-Cycle Pop-up Simulator</span>
+            <Sparkles className="h-4.5 w-4.5 text-champagne" strokeWidth={1.75} />
+            <span className="text-xs font-bold text-charcoal">End-of-Cycle Pop-up Simulator</span>
           </div>
-          <p className="text-[10px] text-slate-muted leading-relaxed">
+          <p className="text-[10px] text-sage leading-relaxed">
             Trigger a 10th-day cycle rollover. Sweeps remaining liquid cash (Hand Money) to savings goals and creates a new cycle period.
           </p>
           <button
             type="button"
             onClick={handleTriggerCloseoutSimulator}
-            className="w-full bg-champagne py-3.5 rounded text-xs font-bold text-obsidian shadow-gold-glow transition-all active:scale-95 min-h-[44px]"
+            className="w-full bg-black hover:bg-charcoal py-3.5 rounded-full text-xs font-bold text-white transition-all active:scale-[0.98] min-h-[44px] cursor-pointer shadow-sm"
           >
             Simulate End of Cycle
           </button>
@@ -1777,27 +1879,30 @@ export default function Dashboard() {
       const today = new Date();
       for (let i = 0; i < 3; i++) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); // e.g. "June 2026"
-        const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; // e.g. "2026-06"
+        const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        // Prefix YYYY-MM
+        const year = d.getFullYear();
+        const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+        const prefix = `${year}-${monthNum}`;
         list.push({ label, prefix });
       }
       return list;
     };
 
     const lastThreeMonths = getLastThreeMonths();
-    const todayLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const todayLabel = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
     return (
-      <div className="glass-panel rounded-xl bg-slate-surface/40 border border-slate-border p-5 space-y-4">
+      <div className="glass-panel p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold tracking-wider uppercase text-white font-bold">Monthly History</h3>
-          <span className="text-[10px] text-slate-muted font-mono bg-obsidian px-2 py-0.5 rounded border border-slate-border/40">
-            Archined Ledgers
+          <h3 className="text-xs font-bold tracking-wider uppercase text-charcoal">Monthly History</h3>
+          <span className="text-[9px] text-sage font-bold bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/50">
+            Archived Ledgers
           </span>
         </div>
 
-        {/* Accordions */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {lastThreeMonths.map(({ label, prefix }) => {
             const isCurrentMonth = label === todayLabel;
             return renderMonthAccordion(label, prefix, isCurrentMonth);
@@ -1861,78 +1966,78 @@ export default function Dashboard() {
     };
 
     return (
-      <div key={monthName} className="bg-obsidian/30 rounded-lg border border-slate-border/20 overflow-hidden transition-all duration-300">
+      <div key={monthName} className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm transition-all duration-300">
         
         {/* Accordion Header */}
         <button
           type="button"
           onClick={() => toggleMonth(monthName)}
-          className="w-full flex items-center justify-between min-h-[44px] px-4 py-3 text-xs font-semibold text-white active:bg-white/5 transition-all active:scale-95"
+          className="w-full flex items-center justify-between min-h-[48px] px-4 py-3 text-xs font-bold hover:bg-slate-50 transition-all text-charcoal active:scale-[0.99] cursor-pointer"
         >
           <div className="flex items-center gap-1.5">
-            <Calendar className="h-4 w-4 text-champagne" />
+            <Calendar className="h-4.5 w-4.5 text-sage" strokeWidth={1.75} />
             <span>{monthName}</span>
             {isCurrentMonth && (
-              <span className="text-[8px] uppercase tracking-wider bg-emerald/10 text-emerald border border-emerald/20 px-1.5 py-0.2 rounded ml-1 font-mono">
+              <span className="text-[8px] uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full ml-1 font-sans font-bold">
                 Active
               </span>
             )}
           </div>
-          {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-muted" /> : <ChevronDown className="h-4 w-4 text-slate-muted" />}
+          {isExpanded ? <ChevronUp className="h-4.5 w-4.5 text-sage" strokeWidth={2} /> : <ChevronDown className="h-4.5 w-4.5 text-sage" strokeWidth={2} />}
         </button>
 
         {/* Accordion Body */}
         {isExpanded && (
-          <div className="p-4 border-t border-slate-border/10 space-y-4 text-xs bg-obsidian-light/20">
+          <div className="p-4 border-t border-slate-100 space-y-5 text-xs bg-slate-50/50">
             
             {/* Top metrics summary */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-obsidian/50 p-2 rounded">
-                <span className="text-[9px] text-slate-muted block">Total Income</span>
-                <span className="font-mono text-white font-bold block mt-0.5">{formatCurrency(monthIncome)}</span>
+            <div className="grid grid-cols-3 gap-2.5 text-center">
+              <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
+                <span className="text-[8px] uppercase tracking-wider text-sage font-bold block mb-1">Total Income</span>
+                <span className="font-sans text-xs text-charcoal font-extrabold block mt-0.5">{formatCurrency(monthIncome)}</span>
               </div>
-              <div className="bg-obsidian/50 p-2 rounded">
-                <span className="text-[9px] text-slate-muted block">Total Spent</span>
-                <span className="font-mono text-crimson font-bold block mt-0.5">{formatCurrency(monthExpenses)}</span>
+              <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
+                <span className="text-[8px] uppercase tracking-wider text-sage font-bold block mb-1">Total Spent</span>
+                <span className="font-sans text-xs text-rose-500 font-extrabold block mt-0.5">{formatCurrency(monthExpenses)}</span>
               </div>
-              <div className="bg-obsidian/50 p-2 rounded">
-                <span className="text-[9px] text-slate-muted block">Saved Sweeps</span>
-                <span className="font-mono text-emerald font-bold block mt-0.5">{formatCurrency(monthSweeps)}</span>
+              <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
+                <span className="text-[8px] uppercase tracking-wider text-sage font-bold block mb-1">Saved Sweeps</span>
+                <span className="font-sans text-xs text-emerald-600 font-extrabold block mt-0.5">{formatCurrency(monthSweeps)}</span>
               </div>
             </div>
 
             {/* Spending Outlay */}
-            <div className="space-y-2 pt-2 border-t border-slate-border/15">
-              <span className="text-[9px] uppercase tracking-wider text-slate-muted font-bold block">Spending Outlay</span>
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <span className="text-[8px] uppercase tracking-wider text-sage font-bold block">Spending Outlay</span>
               
               <div className="grid grid-cols-2 gap-2.5">
-                <div className="bg-obsidian/40 p-2.5 rounded border border-slate-border/10 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-muted font-medium">Food & Groceries</span>
-                  <span className="font-mono text-xs font-semibold text-white mt-1 font-bold">{formatCurrency(foodExpenses)}</span>
+                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
+                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">Food & Groceries</span>
+                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(foodExpenses)}</span>
                 </div>
-                <div className="bg-obsidian/40 p-2.5 rounded border border-slate-border/10 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-muted font-medium">Commutes & Highway</span>
-                  <span className="font-mono text-xs font-semibold text-white mt-1 font-bold">{formatCurrency(travelExpenses)}</span>
+                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
+                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">Commutes & Highway</span>
+                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(travelExpenses)}</span>
                 </div>
-                <div className="bg-obsidian/40 p-2.5 rounded border border-slate-border/10 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-muted font-medium">Rent & Utility Bills</span>
-                  <span className="font-mono text-xs font-semibold text-white mt-1 font-bold">{formatCurrency(rentUtilityExpenses)}</span>
+                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
+                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">Rent & Utility Bills</span>
+                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(rentUtilityExpenses)}</span>
                 </div>
-                <div className="bg-obsidian/40 p-2.5 rounded border border-slate-border/10 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-muted font-medium">General / Subscriptions</span>
-                  <span className="font-mono text-xs font-semibold text-white mt-1 font-bold">{formatCurrency(generalExpenses)}</span>
+                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
+                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">General / Other</span>
+                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(generalExpenses)}</span>
                 </div>
               </div>
             </div>
 
             {/* DIRECT DATE TIMELINE ACCORDION */}
-            <div className="space-y-2 pt-3 border-t border-slate-border/15">
-              <span className="text-[9px] uppercase tracking-wider text-slate-muted font-bold block font-semibold">Date Timeline</span>
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <span className="text-[8px] uppercase tracking-wider text-sage font-bold block">Date Timeline</span>
               
               {sortedDates.length === 0 ? (
-                <p className="text-xs text-slate-muted italic text-center py-2">No transactions recorded</p>
+                <p className="text-xs text-sage italic text-center py-2 bg-white border border-slate-100 rounded-xl">No transactions recorded</p>
               ) : (
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {sortedDates.map(dateStr => {
                     const dayItems = groupedByDate[dateStr];
                     const dateKey = `${monthName}-${dateStr}`;
@@ -1945,46 +2050,53 @@ export default function Dashboard() {
                     const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : dateStr;
 
                     return (
-                      <div key={dateStr} className="border border-slate-border/10 rounded overflow-hidden bg-obsidian/20">
+                      <div key={dateStr} className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-sm">
                         <button
                           type="button"
                           onClick={() => setExpandedMonthlyDates(prev => ({ ...prev, [dateKey]: !isDateExpanded }))}
-                          className="w-full flex justify-between items-center min-h-[44px] px-3 py-2.5 text-[10px] active:bg-slate-surface/20 transition-all text-white font-medium active:scale-95"
+                          className="w-full flex justify-between items-center min-h-[40px] px-3 py-2.5 text-[10px] hover:bg-slate-50 transition-all text-charcoal font-bold active:scale-[0.99] cursor-pointer"
                         >
-                          <span className="font-mono">{formattedDate}</span>
+                          <span>{formattedDate}</span>
                           <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-slate-muted">Spent: {formatCurrency(daySpent)}</span>
-                            <ChevronDown className={`h-3 w-3 text-slate-muted transition-transform duration-200 ${isDateExpanded ? 'rotate-180' : ''}`} />
+                            <span className="text-sage">Spent: <span className="text-charcoal font-bold">{formatCurrency(daySpent)}</span></span>
+                            <ChevronDown className={`h-3 w-3 text-sage transition-transform duration-200 ${isDateExpanded ? 'rotate-180' : ''}`} strokeWidth={2} />
                           </div>
                         </button>
 
                         {isDateExpanded && (
-                          <div className="border-t border-slate-border/10 p-2 space-y-1.5 bg-obsidian-light/5">
+                          <div className="border-t border-slate-100 p-2 space-y-2 bg-slate-50/50">
                             {dayItems.map(t => {
                               const isExpense = t.type === 'expense';
                               const isBank = t.description.startsWith('[Bank]');
-                              const sourceLabel = isBank ? 'Bank Money' : 'Hand Money';
+                              const sourceLabel = isBank ? 'Bank' : 'Hand';
                               
                               let descClean = t.description;
                               if (descClean.startsWith('[Bank]')) descClean = descClean.replace('[Bank]', '').trim();
                               if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
 
                               return (
-                                <div key={t.id} className="flex justify-between items-center p-1.5 rounded bg-obsidian/30 border border-slate-border/5 text-[10px]">
-                                  <div className="min-w-0 pr-2">
-                                    <div className="flex items-center gap-1">
-                                      <span className={`text-[7px] uppercase font-mono px-1 py-0.2 rounded font-bold ${
+                                <div 
+                                  key={t.id} 
+                                  className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-100 hover:border-slate-200/80 hover:shadow-sm transition-all duration-200 group/item text-left text-[10px]"
+                                >
+                                  {/* Avatar */}
+                                  {getTransactionAvatar(t.category, t.description, t.type)}
+
+                                  {/* Details */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`text-[7px] uppercase px-1 py-0.2 rounded font-bold ${
                                         isBank 
-                                          ? 'border border-blue-500/40 text-blue-400 bg-blue-500/5' 
-                                          : 'border border-amber-500/40 text-amber-400 bg-amber-500/5'
+                                          ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
+                                          : 'bg-amber-50 text-amber-600 border border-amber-100/50'
                                       }`}>
                                         {sourceLabel}
                                       </span>
-                                      <span className="text-[8px] text-slate-muted font-semibold">{t.category}</span>
+                                      <span className="text-[8px] text-sage font-semibold">{t.category}</span>
                                     </div>
-                                    <p className="text-white mt-0.5 font-medium">{descClean}</p>
+                                    <p className="text-[11px] font-semibold text-charcoal mt-0.5 leading-tight">{descClean}</p>
                                   </div>
-                                  <span className={`font-mono font-semibold ${isExpense ? 'text-crimson' : 'text-emerald'}`}>
+                                  <span className={`font-sans text-[11px] font-black flex-shrink-0 ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>
                                     {isExpense ? '-' : '+'}{formatCurrency(Math.abs(t.amount))}
                                   </span>
                                 </div>
@@ -2002,9 +2114,9 @@ export default function Dashboard() {
             {/* Print statement button */}
             <button
               onClick={() => handlePrintMonthlyStatement(monthName)}
-              className="w-full bg-slate-surface active:bg-white/5 border border-slate-border/60 min-h-[44px] rounded text-xs font-semibold text-champagne flex items-center justify-center gap-1.5 transition-all mt-2 active:scale-95"
+              className="w-full bg-black hover:bg-charcoal border-none min-h-[44px] rounded-full text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all mt-3 active:scale-[0.98] cursor-pointer shadow-sm"
             >
-              <Printer className="h-3.5 w-3.5" />
+              <Printer className="h-3.5 w-3.5" strokeWidth={2} />
               <span>Download Statement PDF</span>
             </button>
 

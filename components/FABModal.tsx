@@ -73,6 +73,12 @@ export default function FABModal() {
     setIsOpen(true);
   };
 
+  React.useEffect(() => {
+    const handleOpenEvent = () => handleOpen();
+    window.addEventListener('open-fab-modal', handleOpenEvent);
+    return () => window.removeEventListener('open-fab-modal', handleOpenEvent);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -122,10 +128,10 @@ export default function FABModal() {
 
   return (
     <>
-      {/* Floating Action Button */}
+      {/* Floating Action Button (Desktop Only) */}
       <button
         onClick={handleOpen}
-        className="no-print fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-obsidian-light border border-champagne text-champagne shadow-gold-glow transition-all duration-300 active:scale-95"
+        className="no-print hidden lg:flex fixed bottom-8 right-8 z-40 h-14 w-14 items-center justify-center rounded-full bg-black hover:bg-charcoal text-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-95 border-none cursor-pointer"
         aria-label="Add entry"
       >
         <Plus className="h-6 w-6 stroke-[2]" />
@@ -150,23 +156,23 @@ export default function FABModal() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="glass-panel relative z-10 w-full max-w-lg overflow-hidden rounded-t-2xl sm:rounded-2xl bg-slate-surface/95 border-t border-x sm:border border-slate-border text-white shadow-2xl"
+              className="glass-panel relative z-10 w-full max-w-lg overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white border-t border-x sm:border border-slate-100 text-charcoal shadow-2xl"
             >
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-border/50 px-6 py-4">
-                <h3 className="font-semibold text-base tracking-wide uppercase text-champagne">
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                <h3 className="font-bold text-sm tracking-wide uppercase text-charcoal">
                   The Vault Ledger Entry
                 </h3>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="rounded-full p-2.5 text-slate-muted active:bg-white/5 active:text-white transition-all active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  className="rounded-full p-2.5 text-sage hover:text-charcoal hover:bg-slate-100 transition-all active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               {/* Segmented Control */}
-              <div className="flex overflow-x-auto border-b border-slate-border/40 p-2 gap-1 bg-obsidian/40 scrollbar-none">
+              <div className="flex overflow-x-auto border-b border-slate-100 p-2 gap-1 bg-slate-50 scrollbar-none">
                 {[
                   { id: 'expense', label: 'Expense', icon: TrendingDown },
                   { id: 'income', label: 'Income', icon: TrendingUp },
@@ -181,10 +187,10 @@ export default function FABModal() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex-shrink-0 flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg text-xs font-medium transition-all duration-300 min-h-[44px] active:scale-95 ${
+                      className={`flex-shrink-0 flex items-center justify-center gap-1 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 min-h-[40px] active:scale-95 cursor-pointer ${
                         isActive
-                          ? 'bg-champagne/15 text-champagne border border-champagne/30 shadow-inner'
-                          : 'text-slate-muted active:text-white active:bg-white/5'
+                          ? 'bg-white text-charcoal border border-slate-200 shadow-sm font-extrabold'
+                          : 'text-sage hover:text-charcoal hover:bg-slate-100/50'
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -201,15 +207,15 @@ export default function FABModal() {
                 {activeTab === 'expense' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold">Payment Source</label>
-                      <div className="flex border border-slate-border/50 rounded-lg p-1 bg-obsidian/30">
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Payment Source</label>
+                      <div className="flex border border-slate-100 rounded-xl p-1 bg-slate-50">
                          <button
                           type="button"
                           onClick={() => setPaymentSource('hand')}
-                          className={`flex-1 py-3 text-xs font-semibold rounded transition-all min-h-[44px] active:scale-95 ${
+                          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all min-h-[40px] active:scale-95 cursor-pointer ${
                             paymentSource === 'hand'
-                              ? 'bg-champagne text-obsidian font-bold shadow'
-                              : 'text-slate-muted active:text-white'
+                              ? 'bg-white text-charcoal shadow-sm border border-slate-200/50 font-extrabold'
+                              : 'text-sage hover:text-charcoal'
                           }`}
                         >
                           Hand Money
@@ -217,10 +223,10 @@ export default function FABModal() {
                         <button
                           type="button"
                           onClick={() => setPaymentSource('bank')}
-                          className={`flex-1 py-3 text-xs font-semibold rounded transition-all min-h-[44px] active:scale-95 ${
+                          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all min-h-[40px] active:scale-95 cursor-pointer ${
                             paymentSource === 'bank'
-                              ? 'bg-champagne text-obsidian font-bold shadow'
-                              : 'text-slate-muted active:text-white'
+                              ? 'bg-white text-charcoal shadow-sm border border-slate-200/50 font-extrabold'
+                              : 'text-sage hover:text-charcoal'
                           }`}
                         >
                           Bank Money
@@ -229,54 +235,54 @@ export default function FABModal() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Amount (Rs.)</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Amount (Rs.)</label>
                       <input
                         type="number"
                         required
                         placeholder="0.00"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-lg font-mono placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-lg font-sans placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Category</label>
+                        <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Category</label>
                         <select
                           value={category}
                           onChange={(e) => setCategory(e.target.value)}
-                          className="glass-input w-full rounded-lg px-3 py-3 text-sm focus:border-champagne"
+                          className="glass-input w-full rounded-xl px-3 py-3 text-sm focus:border-charcoal bg-slate-50 text-charcoal cursor-pointer"
                         >
-                          <option value="Food" className="bg-slate-surface text-white">Food</option>
-                          <option value="Travel (Colombo)" className="bg-slate-surface text-white">Travel (Colombo)</option>
-                          <option value="Travel (Home)" className="bg-slate-surface text-white">Travel (Home)</option>
-                          <option value="Rent" className="bg-slate-surface text-white">Rent</option>
-                          <option value="Electricity" className="bg-slate-surface text-white">Electricity</option>
-                          <option value="General" className="bg-slate-surface text-white">General</option>
+                          <option value="Food" className="bg-white text-charcoal">Food</option>
+                          <option value="Travel (Colombo)" className="bg-white text-charcoal">Travel (Colombo)</option>
+                          <option value="Travel (Home)" className="bg-white text-charcoal">Travel (Home)</option>
+                          <option value="Rent" className="bg-white text-charcoal">Rent</option>
+                          <option value="Electricity" className="bg-white text-charcoal">Electricity</option>
+                          <option value="General" className="bg-white text-charcoal">General</option>
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Date</label>
+                        <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Date</label>
                         <input
                           type="date"
                           required
                           value={date}
                           onChange={(e) => setDate(e.target.value)}
-                          className="glass-input w-full rounded-lg px-4 py-3 text-sm"
+                          className="glass-input w-full rounded-xl px-4 py-3 text-sm bg-slate-50 text-charcoal"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Description</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Description</label>
                       <input
                         type="text"
                         placeholder="e.g. Cafe, Groceries, Utility bill"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-sm placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-sm placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
                   </>
@@ -286,49 +292,49 @@ export default function FABModal() {
                 {activeTab === 'income' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Cycle Starting Budget (Rs.)</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Cycle Starting Budget (Rs.)</label>
                       <input
                         type="number"
                         required
                         placeholder="0.00"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-lg font-mono placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-lg font-sans placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Start Date</label>
+                        <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Start Date</label>
                         <input
                           type="date"
                           required
                           value={cycleStartDate}
                           onChange={(e) => setCycleStartDate(e.target.value)}
-                          className="glass-input w-full rounded-lg px-4 py-3 text-sm"
+                          className="glass-input w-full rounded-xl px-4 py-3 text-sm bg-slate-50 text-charcoal"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">End Date (10 days)</label>
+                        <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">End Date (10 days)</label>
                         <input
                           type="date"
                           required
                           value={cycleEndDate}
                           onChange={(e) => setCycleEndDate(e.target.value)}
-                          className="glass-input w-full rounded-lg px-4 py-3 text-sm"
+                          className="glass-input w-full rounded-xl px-4 py-3 text-sm bg-slate-50 text-charcoal"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Description</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Description</label>
                       <input
                         type="text"
                         placeholder="e.g. Mid-Month Funding Cycle"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-sm placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-sm placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
                   </>
@@ -338,30 +344,30 @@ export default function FABModal() {
                 {activeTab === 'withdrawal' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Withdrawal Amount (Rs.)</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Withdrawal Amount (Rs.)</label>
                       <input
                         type="number"
                         required
                         placeholder="0.00"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-lg font-mono placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-lg font-sans placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Date</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Date</label>
                       <input
                         type="date"
                         required
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-sm"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-sm bg-slate-50 text-charcoal"
                       />
                     </div>
 
-                    <div className="rounded-lg bg-champagne/5 p-4 border border-champagne/20 text-xs text-slate-muted leading-relaxed">
-                      <Info className="h-4 w-4 inline mr-1.5 text-champagne" />
+                    <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-xs text-sage leading-relaxed">
+                      <Info className="h-4 w-4 inline mr-1.5 text-sage" strokeWidth={2} />
                       <span>This dedicated withdrawal transaction type automatically subtracts the specified value from the **Bank Money** pool and transfers it to the **Hand Money** pool.</span>
                     </div>
                   </>
@@ -371,67 +377,67 @@ export default function FABModal() {
                 {activeTab === 'debt' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Amount (Rs.)</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Amount (Rs.)</label>
                       <input
                         type="number"
                         required
                         placeholder="0.00"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-lg font-mono placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-lg font-sans placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Person Name</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Person Name</label>
                       <div className="relative">
-                        <User className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-muted" />
+                        <User className="absolute left-3.5 top-3.5 h-4 w-4 text-sage" />
                         <input
                           type="text"
                           required
                           placeholder="e.g. Victoria Sterling"
                           value={personName}
                           onChange={(e) => setPersonName(e.target.value)}
-                          className="glass-input w-full rounded-lg pl-10 pr-4 py-3 text-sm placeholder:text-slate-muted/40"
+                          className="glass-input w-full rounded-xl pl-10 pr-4 py-3 text-sm placeholder:text-slate-400 bg-slate-50 text-charcoal"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Debt Relationship</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Debt Relationship</label>
                       <div className="flex gap-4">
-                         <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-border/50 min-h-[44px] py-3 cursor-pointer bg-obsidian/30 transition-all active:scale-95 active:border-champagne/40">
+                         <label className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-100 min-h-[44px] py-3 cursor-pointer bg-slate-50 transition-all active:scale-95 active:border-slate-200">
                           <input
                             type="radio"
                             name="debtType"
                             checked={debtType === 'lent'}
                             onChange={() => setDebtType('lent')}
-                            className="accent-champagne"
+                            className="accent-black"
                           />
-                          <span className={`text-xs font-semibold ${debtType === 'lent' ? 'text-champagne' : 'text-slate-muted'}`}>Lent (They owe me)</span>
+                          <span className={`text-xs font-bold ${debtType === 'lent' ? 'text-charcoal font-black' : 'text-sage'}`}>Lent (They owe me)</span>
                         </label>
 
-                        <label className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-border/50 min-h-[44px] py-3 cursor-pointer bg-obsidian/30 transition-all active:scale-95 active:border-crimson/40">
+                        <label className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-100 min-h-[44px] py-3 cursor-pointer bg-slate-50 transition-all active:scale-95 active:border-slate-200">
                           <input
                             type="radio"
                             name="debtType"
                             checked={debtType === 'borrowed'}
                             onChange={() => setDebtType('borrowed')}
-                            className="accent-crimson"
+                            className="accent-rose-500"
                           />
-                          <span className={`text-xs font-semibold ${debtType === 'borrowed' ? 'text-crimson' : 'text-slate-muted'}`}>Borrowed (I owe them)</span>
+                          <span className={`text-xs font-bold ${debtType === 'borrowed' ? 'text-rose-600 font-black' : 'text-sage'}`}>Borrowed (I owe them)</span>
                         </label>
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Reason / Description</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Reason / Description</label>
                       <input
                         type="text"
                         placeholder="e.g. Travel tickets reimbursement"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-sm placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-sm placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
                   </>
@@ -441,40 +447,40 @@ export default function FABModal() {
                 {activeTab === 'adjustment' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Select Wallet to Adjust</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Select Wallet to Adjust</label>
                       <select
                         value={adjustmentWallet}
                         onChange={(e) => setAdjustmentWallet(e.target.value as any)}
-                        className="glass-input w-full rounded-lg px-3 py-3 text-sm focus:border-champagne"
+                        className="glass-input w-full rounded-xl px-3 py-3 text-sm focus:border-charcoal bg-slate-50 text-charcoal cursor-pointer"
                       >
-                        <option value="wallet-hand" className="bg-slate-surface text-white">Hand Money (Cash in Hand)</option>
-                        <option value="wallet-bank" className="bg-slate-surface text-white">Bank Money (Checking/Savings)</option>
-                        <option value="wallet-option" className="bg-slate-surface text-white">Option Money (Steerable Balance)</option>
+                        <option value="wallet-hand" className="bg-white text-charcoal">Hand Money (Cash in Hand)</option>
+                        <option value="wallet-bank" className="bg-white text-charcoal">Bank Money (Checking/Savings)</option>
+                        <option value="wallet-option" className="bg-white text-charcoal">Option Money (Steerable Balance)</option>
                       </select>
                     </div>
 
-                    <div className="rounded-lg bg-obsidian/60 p-4 border border-slate-border/30 text-xs space-y-2">
-                      <div className="flex justify-between items-center text-slate-muted">
+                    <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-xs space-y-2">
+                      <div className="flex justify-between items-center text-sage font-bold">
                         <span>Expected Wallet Value:</span>
-                        <span className="font-mono text-white font-medium">Rs. {selectedExpected.toLocaleString()}</span>
+                        <span className="font-sans text-charcoal font-black">Rs. {selectedExpected.toLocaleString()}</span>
                       </div>
                       {adjustmentWallet === 'wallet-hand' && (
-                        <div className="text-[10px] text-slate-muted leading-relaxed flex gap-1.5 items-start">
-                          <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-champagne" />
+                        <div className="text-[10px] text-sage leading-relaxed flex gap-1.5 items-start">
+                          <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-sage" strokeWidth={2} />
                           <span>Hand cash adjustment automatically logs an audit transaction mismatch.</span>
                         </div>
                       )}
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-muted font-bold block">Actual Real-life Balance (Rs.)</label>
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Actual Real-life Balance (Rs.)</label>
                       <input
                         type="number"
                         required
                         placeholder="0.00"
                         value={actualBalance}
                         onChange={(e) => setActualBalance(e.target.value)}
-                        className="glass-input w-full rounded-lg px-4 py-3 text-lg font-mono placeholder:text-slate-muted/40"
+                        className="glass-input w-full rounded-xl px-4 py-3 text-lg font-sans placeholder:text-slate-400 bg-slate-50 text-charcoal"
                       />
                     </div>
 
@@ -482,13 +488,13 @@ export default function FABModal() {
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
-                        className="p-3 text-[10px] flex flex-col gap-1 border border-slate-border/30 bg-obsidian/40 rounded-lg"
+                        className="p-3 text-[10px] flex flex-col gap-1 border border-slate-100 bg-slate-50 rounded-xl"
                       >
                         <div className="flex justify-between items-center font-medium">
-                          <span className={isNegativeDiscrepancy ? 'text-crimson' : 'text-emerald'}>
+                          <span className={isNegativeDiscrepancy ? 'text-rose-500 font-bold' : 'text-emerald-600 font-bold'}>
                             {isNegativeDiscrepancy ? 'Deduction / Deficit:' : 'Addition / Surplus:'}
                           </span>
-                          <span className={`font-mono ${isNegativeDiscrepancy ? 'text-crimson' : 'text-emerald'}`}>
+                          <span className={`font-sans font-black ${isNegativeDiscrepancy ? 'text-rose-500' : 'text-emerald-600'}`}>
                             Rs. {Math.abs(discrepancy).toLocaleString()}
                           </span>
                         </div>
@@ -498,17 +504,17 @@ export default function FABModal() {
                 )}
 
                 {/* Footer Buttons */}
-                <div className="flex gap-3 pt-4 border-t border-slate-border/50">
+                <div className="flex gap-3 pt-4 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setIsOpen(false)}
-                    className="flex-1 rounded-lg border border-slate-border/50 min-h-[44px] py-3 text-sm font-medium text-slate-muted active:bg-white/5 active:text-white transition-all active:scale-95 flex items-center justify-center"
+                    className="flex-1 rounded-full border border-slate-200 min-h-[44px] py-3 text-sm font-bold text-sage hover:bg-slate-50 transition-all active:scale-95 flex items-center justify-center cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-champagne py-3 text-sm font-semibold text-obsidian shadow-gold-glow transition-all duration-300 active:scale-95 min-h-[44px]"
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-full bg-black hover:bg-charcoal py-3 text-sm font-extrabold text-white transition-all duration-300 active:scale-95 min-h-[44px] cursor-pointer shadow-sm"
                   >
                     <Check className="h-4 w-4 stroke-[2.5]" />
                     <span>Post Ledger</span>
