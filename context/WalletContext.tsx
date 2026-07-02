@@ -35,7 +35,7 @@ interface WalletContextType {
   optionMoney: number;
   updateWalletBalance: (id: string, amount: number) => Promise<void>;
   addExpense: (amount: number, description: string, category: string, date: string, source?: 'hand' | 'bank') => Promise<void>;
-  addIncome: (amount: number, description: string, startDate: string, endDate: string) => Promise<void>;
+  addIncome: (amount: number, description: string, destination: 'hand' | 'bank' | 'option', setCycle: boolean, startDate?: string, endDate?: string) => Promise<void>;
   addWithdrawal: (amount: number, date: string) => Promise<void>;
   addDebt: (amount: number, personName: string, type: 'lent' | 'borrowed', description: string) => Promise<void>;
   settleDebt: (debtId: string, settleAmount: number, source?: 'hand' | 'bank') => Promise<void>;
@@ -45,7 +45,7 @@ interface WalletContextType {
   depositToSavings: (bankId: string, amount: number) => Promise<void>;
   closeActiveCycleAndSweep: (sweepAmount: number, bankId: string, nextCycleIncome: number, nextCycleStart: string, nextCycleEnd: string) => Promise<void>;
   updateActiveCycleIncome: (amount: number) => Promise<void>;
-  editTransaction: (id: string, amount: number, description: string, category: string, source: 'hand' | 'bank') => Promise<void>;
+  editTransaction: (id: string, amount: number, description: string, category: string, source: 'hand' | 'bank' | 'option') => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   resetToMocks: () => Promise<void>;
 }
@@ -277,56 +277,117 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveStateToLocal(cycles, updatedTransactions, debts, updatedSavings);
   };
 
-  // Add Income (increases Bank Money)
-  const addIncome = async (amount: number, description: string, startDate: string, endDate: string) => {
-    const newCycle: Cycle = {
-      id: Math.random().toString(36).substring(2, 9),
-      start_date: startDate,
-      end_date: endDate,
-      income: amount,
-      description: description || 'New Cycle Ledger',
-      created_at: new Date().toISOString(),
-    };
+  // Add Income (increases selected wallet)
+  const addIncome = async (
+    amount: number,
+    description: string,
+    destination: 'hand' | 'bank' | 'option',
+    setCycle: boolean,
+    startDate?: string,
+    endDate?: string
+  ) => {
+    let updatedSavings = [...savings];
+    let updatedCycles = [...cycles];
+    let updatedTransactions = [...transactions];
 
-    const currentBankObj = savings.find(s => s.id === 'wallet-bank');
-    const newBankBalance = (currentBankObj ? currentBankObj.current_balance : 50000) + amount;
-    
-    // Bank Money increases, Hand Money is initialized equal to Base Income
-    const updatedSavings = savings.map(s => {
-      if (s.id === 'wallet-bank') return { ...s, current_balance: newBankBalance };
-      if (s.id === 'wallet-hand') return { ...s, current_balance: amount };
-      return s;
-    });
-    setSavings(updatedSavings);
+    const walletId = destination === 'hand' 
+      ? 'wallet-hand' 
+      : destination === 'option' 
+        ? 'wallet-option' 
+        : 'wallet-bank';
 
-    const incomeTrans: Transaction = {
-      id: Math.random().toString(36).substring(2, 9),
-      cycle_id: newCycle.id,
-      amount,
-      type: 'income',
-      category: 'Cycle Income',
-      description: description || 'Cycle Base Income',
-      date: startDate,
-      created_at: new Date().toISOString()
-    };
+    const currentWalletObj = savings.find(s => s.id === walletId);
+    const newWalletBalance = (currentWalletObj ? currentWalletObj.current_balance : 0) + amount;
 
-    const updatedTransactions = [incomeTrans, ...transactions];
-    const updatedCycles = [newCycle, ...cycles];
-    
-    setCycles(updatedCycles);
-    setTransactions(updatedTransactions);
+    if (setCycle) {
+      const sDate = startDate || new Date().toISOString().split('T')[0];
+      const eDate = endDate || new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        await client.from('cycles').insert(newCycle as any);
-        await client.from('savings_vault').update({ current_balance: newBankBalance } as any).eq('id', 'wallet-bank');
-        await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand');
-        await client.from('transactions').insert(incomeTrans as any);
-      } catch (err) {
-        console.error("Supabase addIncome error:", err);
+      const newCycle: Cycle = {
+        id: Math.random().toString(36).substring(2, 9),
+        start_date: sDate,
+        end_date: eDate,
+        income: amount,
+        description: description || 'New Cycle Ledger',
+        created_at: new Date().toISOString(),
+      };
+
+      updatedCycles = [newCycle, ...cycles];
+
+      // Set Hand Money equal to the new cycle income amount
+      // and also apply the credit to the selected destination wallet
+      updatedSavings = savings.map(s => {
+        if (s.id === 'wallet-hand') {
+          return { ...s, current_balance: amount };
+        }
+        if (s.id === walletId && walletId !== 'wallet-hand') {
+          return { ...s, current_balance: newWalletBalance };
+        }
+        return s;
+      });
+
+      const incomeTrans: Transaction = {
+        id: Math.random().toString(36).substring(2, 9),
+        cycle_id: newCycle.id,
+        amount,
+        type: 'income',
+        category: 'Cycle Income',
+        description: `[${destination === 'hand' ? 'Hand' : destination === 'option' ? 'Option' : 'Bank'}] ${description || 'Cycle Base Income'}`,
+        date: sDate,
+        created_at: new Date().toISOString()
+      };
+
+      updatedTransactions = [incomeTrans, ...transactions];
+
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          await client.from('cycles').insert(newCycle as any);
+          await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand');
+          if (walletId !== 'wallet-hand') {
+            await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+          }
+          await client.from('transactions').insert(incomeTrans as any);
+        } catch (err) {
+          console.error("Supabase addIncome error:", err);
+        }
+      }
+
+    } else {
+      // Just add income to destination wallet, do not start new cycle
+      updatedSavings = savings.map(s => {
+        if (s.id === walletId) {
+          return { ...s, current_balance: newWalletBalance };
+        }
+        return s;
+      });
+
+      // Transaction is linked to the active cycle, if one exists
+      const incomeTrans: Transaction = {
+        id: Math.random().toString(36).substring(2, 9),
+        cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
+        amount,
+        type: 'income',
+        category: 'Cycle Income',
+        description: `[${destination === 'hand' ? 'Hand' : destination === 'option' ? 'Option' : 'Bank'}] ${description || 'Additional Income'}`,
+        date: startDate || new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString()
+      };
+
+      updatedTransactions = [incomeTrans, ...transactions];
+
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+          await client.from('transactions').insert(incomeTrans as any);
+        } catch (err) {
+          console.error("Supabase addIncome error (no cycle):", err);
+        }
       }
     }
 
+    setSavings(updatedSavings);
+    setTransactions(updatedTransactions);
+    setCycles(updatedCycles);
     saveStateToLocal(updatedCycles, updatedTransactions, debts, updatedSavings);
   };
 
@@ -625,17 +686,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       created_at: new Date().toISOString(),
     };
 
-    // Set Hand Money equal to the next cycle's base income
-    updatedSavings = updatedSavings.map(s => {
-      if (s.id === 'wallet-hand') return { ...s, current_balance: nextCycleIncome };
-      return s;
-    });
+    const finalHandBalance = updatedSavings.find(s => s.id === 'wallet-hand')?.current_balance ?? handMoney;
 
     const updatedCycles = [newCycle, ...cycles];
 
     if (isSupabaseConfigured() && supabase) {
       try {
-        await client.from('savings_vault').update({ current_balance: nextCycleIncome } as any).eq('id', 'wallet-hand');
+        await client.from('savings_vault').update({ current_balance: finalHandBalance } as any).eq('id', 'wallet-hand');
         await client.from('cycles').insert(newCycle as any);
       } catch (e) {
         console.error("Supabase cycle rollover savings_vault/cycle update error:", e);
@@ -676,30 +733,33 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     amount: number,
     description: string,
     category: string,
-    source: 'hand' | 'bank'
+    source: 'hand' | 'bank' | 'option'
   ) => {
     const origTrans = transactions.find(t => t.id === id);
     if (!origTrans) return;
 
     const origIsBank = origTrans.description.startsWith('[Bank]');
-    const origSource: 'hand' | 'bank' = origIsBank ? 'bank' : 'hand';
+    const origIsOption = origTrans.description.startsWith('[Option]');
+    const origSource: 'hand' | 'bank' | 'option' = origIsBank ? 'bank' : origIsOption ? 'option' : 'hand';
     const origAmount = Math.abs(origTrans.amount);
 
     let updatedSavings = [...savings];
 
-    // Restore original wallet balance
-    const origWalletId = origSource === 'bank' ? 'wallet-bank' : 'wallet-hand';
+    // Restore original wallet balance (for Income: subtract original; for Expense: add original)
+    const origWalletId = origSource === 'bank' ? 'wallet-bank' : origSource === 'option' ? 'wallet-option' : 'wallet-hand';
     const origWalletObj = savings.find(s => s.id === origWalletId);
     if (origWalletObj) {
-      const restoredVal = origWalletObj.current_balance + origAmount;
+      const multiplier = origTrans.type === 'income' ? -1 : 1;
+      const restoredVal = origWalletObj.current_balance + (origAmount * multiplier);
       updatedSavings = updatedSavings.map(s => s.id === origWalletId ? { ...s, current_balance: restoredVal } : s);
     }
 
-    // Charge the new wallet balance
-    const newWalletId = source === 'bank' ? 'wallet-bank' : 'wallet-hand';
+    // Charge the new wallet balance (for Income: add new; for Expense: subtract new)
+    const newWalletId = source === 'bank' ? 'wallet-bank' : source === 'option' ? 'wallet-option' : 'wallet-hand';
     const newWalletObj = updatedSavings.find(s => s.id === newWalletId);
     if (newWalletObj) {
-      const chargedVal = newWalletObj.current_balance - amount;
+      const multiplier = origTrans.type === 'income' ? 1 : -1;
+      const chargedVal = newWalletObj.current_balance + (amount * multiplier);
       updatedSavings = updatedSavings.map(s => s.id === newWalletId ? { ...s, current_balance: chargedVal } : s);
     }
 
@@ -709,13 +769,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let cleanDesc = description;
     if (cleanDesc.startsWith('[Bank]')) cleanDesc = cleanDesc.replace('[Bank]', '').trim();
     if (cleanDesc.startsWith('[Hand]')) cleanDesc = cleanDesc.replace('[Hand]', '').trim();
-    const finalDescription = `[${source === 'bank' ? 'Bank' : 'Hand'}] ${cleanDesc}`;
+    if (cleanDesc.startsWith('[Option]')) cleanDesc = cleanDesc.replace('[Option]', '').trim();
+    const finalDescription = `[${source === 'bank' ? 'Bank' : source === 'option' ? 'Option' : 'Hand'}] ${cleanDesc}`;
 
     const updatedTrans = transactions.map(t => {
       if (t.id === id) {
         return {
           ...t,
-          amount: -Math.abs(amount),
+          amount: t.type === 'income' ? Math.abs(amount) : -Math.abs(amount),
           description: finalDescription,
           category: category as any
         };
@@ -734,7 +795,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           await client.from('savings_vault').update({ current_balance: newWalletVal } as any).eq('id', newWalletId);
         }
         await client.from('transactions').update({
-          amount: -Math.abs(amount),
+          amount: origTrans.type === 'income' ? Math.abs(amount) : -Math.abs(amount),
           description: finalDescription,
           category: category as any
         } as any).eq('id', id);
@@ -757,7 +818,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (tx.type === 'income') {
       // Deleting an Income subtracts the amount from the correct wallet depending on description prefix
       const isHand = tx.description.includes('[Hand]');
-      const walletId = isHand ? 'wallet-hand' : 'wallet-bank';
+      const isOption = tx.description.includes('[Option]');
+      const walletId = isHand ? 'wallet-hand' : isOption ? 'wallet-option' : 'wallet-bank';
       const wallet = savings.find(s => s.id === walletId);
       if (wallet) {
         const newBalance = wallet.current_balance - amountAbs;

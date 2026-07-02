@@ -87,10 +87,9 @@ export default function Dashboard() {
   const [sweepAmount, setSweepAmount] = useState('');
 
   // 10-Day Cycle closing simulation state
-  const [showCloseoutModal, setShowCloseoutModal] = useState(false);
   const [closeoutSweepAmount, setCloseoutSweepAmount] = useState('');
   const [closeoutSweepBank, setCloseoutSweepBank] = useState('');
-  const [nextCycleIncomeInput, setNextCycleIncomeInput] = useState('120000');
+  const [nextCycleIncomeInput, setNextCycleIncomeInput] = useState('10000');
 
   // Expanded monthly accordion states (stores expanded status per monthYear string)
   const [expandedMonths, setExpandedMonths] = useState<{ [key: string]: boolean }>({
@@ -207,12 +206,30 @@ export default function Dashboard() {
     }
   }, [outflows]);
 
+  // Sync simulator inputs on activeCycle/handMoney/savings changes
+  useEffect(() => {
+    if (activeCycle) {
+      setNextCycleIncomeInput(activeCycle.income.toString());
+    }
+  }, [activeCycle]);
+
+  useEffect(() => {
+    setCloseoutSweepAmount(Math.max(0, handMoney).toFixed(0));
+  }, [handMoney]);
+
+  useEffect(() => {
+    const firstSaving = savings.find(s => s.id !== 'wallet-bank' && s.id !== 'wallet-hand' && s.id !== 'wallet-option');
+    if (firstSaving && !closeoutSweepBank) {
+      setCloseoutSweepBank(firstSaving.id);
+    }
+  }, [savings, closeoutSweepBank]);
+
   // Transaction Edit Modal state
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editAmount, setEditAmount] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editCategory, setEditCategory] = useState('');
-  const [editSource, setEditSource] = useState<'hand' | 'bank'>('hand');
+  const [editSource, setEditSource] = useState<'hand' | 'bank' | 'option'>('hand');
 
   // Filter transactions for continuous calendar month view
   const currentMonthStr = new Date().toISOString().slice(0, 7); // e.g. "2026-06"
@@ -234,7 +251,7 @@ export default function Dashboard() {
     .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  const remainingCycleBalance = totalCycleIncome - cycleExpenses;
+  const remainingCycleBalance = handMoney;
 
   // Active month total income (base + extra incomes)
   const activeMonthIncome = activeTransactions
@@ -317,11 +334,13 @@ export default function Dashboard() {
     
     // Parse payment source from description prefix
     const isBank = t.description.startsWith('[Bank]');
-    setEditSource(isBank ? 'bank' : 'hand');
+    const isOption = t.description.startsWith('[Option]');
+    setEditSource(isBank ? 'bank' : isOption ? 'option' : 'hand');
 
     let cleanDesc = t.description;
     if (cleanDesc.startsWith('[Bank]')) cleanDesc = cleanDesc.replace('[Bank]', '').trim();
     if (cleanDesc.startsWith('[Hand]')) cleanDesc = cleanDesc.replace('[Hand]', '').trim();
+    if (cleanDesc.startsWith('[Option]')) cleanDesc = cleanDesc.replace('[Option]', '').trim();
     setEditDescription(cleanDesc);
     setEditCategory(t.category);
   };
@@ -439,16 +458,23 @@ export default function Dashboard() {
     setSweepAmount('');
   };
 
-  // Close cycle simulation modal trigger
-  const handleTriggerCloseoutSimulator = () => {
-    setCloseoutSweepAmount(Math.max(0, handMoney).toFixed(0));
-    setCloseoutSweepBank(savings.find(s => s.id !== 'wallet-bank' && s.id !== 'wallet-hand' && s.id !== 'wallet-option')?.id || 's-1');
-    setShowCloseoutModal(true);
+  // Perform inline sweep action
+  const handlePerformInlineSweep = async () => {
+    const sweepAmt = parseFloat(closeoutSweepAmount);
+    if (isNaN(sweepAmt) || sweepAmt <= 0) {
+      alert("Please specify a valid sweep amount.");
+      return;
+    }
+    if (sweepAmt > handMoney) {
+      alert("Cannot sweep more than remaining Hand Money balance.");
+      return;
+    }
+    await depositToSavings(closeoutSweepBank, sweepAmt);
+    alert(`Successfully swept Rs. ${sweepAmt.toLocaleString()}!`);
   };
 
-  // Confirm closeout sweep
-  const handleConfirmCloseout = async () => {
-    const sweepAmt = parseFloat(closeoutSweepAmount);
+  // Perform inline start new cycle action (preserves Hand Money, only affects base income)
+  const handlePerformInlineStartNewCycle = async () => {
     const nextIncome = parseFloat(nextCycleIncomeInput);
     if (isNaN(nextIncome) || nextIncome <= 0) {
       alert("Please specify a valid income for the next cycle.");
@@ -461,14 +487,14 @@ export default function Dashboard() {
     const nextEndStr = nextEnd.toISOString().split('T')[0];
 
     await closeActiveCycleAndSweep(
-      isNaN(sweepAmt) ? 0 : sweepAmt,
-      closeoutSweepBank,
+      0, // sweepAmount = 0 (separate)
+      '', // bankId = ''
       nextIncome,
       nextStartStr,
       nextEndStr
     );
 
-    setShowCloseoutModal(false);
+    alert("Successfully started a new 10-day cycle! Remaining Hand Money balance has been preserved.");
   };
 
   // Printing triggers
@@ -518,7 +544,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-muted" />
-            <span className="font-mono text-[10px] tracking-widest uppercase text-slate-muted">Syncing Aura Ledger...</span>
+            <span className="font-mono text-[10px] tracking-widest uppercase text-slate-muted">Syncing MSNA Wallet System...</span>
           </div>
         </div>
       </div>
@@ -641,17 +667,17 @@ export default function Dashboard() {
 
       {/* 4 QUADRANT WALLET ARCHITECTURE (CORE LIQUIDITY BLOCKS) */}
       <div className="no-print max-w-7xl mx-auto px-4 md:px-8 mt-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory scrollbar-none pb-4 px-2 md:px-0">
           
           {/* 1. BANK MONEY */}
-          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
+          <div className="glass-panel p-3.5 rounded-2xl flex-shrink-0 w-[260px] md:w-[calc(25%-12px)] snap-center flex flex-col justify-between relative group transition-all duration-300">
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Bank Money</span>
-              <Landmark className="h-5 w-5 text-sage" strokeWidth={1.75} />
+              <Landmark className="h-4.5 w-4.5 text-sage" strokeWidth={1.75} />
             </div>
             
             {editingWalletId === 'wallet-bank' ? (
-              <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex items-center gap-1.5 mt-1">
                 <input
                   type="number"
                   value={editingWalletValue}
@@ -665,34 +691,34 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-2">
+              <div className="flex items-baseline justify-between mt-1">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer  transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {bankMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className="p-2 text-sage transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
+                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Auto-updates on Incomes & Bank Expenses</p>
+            <p className="text-[9px] text-sage/85 mt-1 leading-tight">Auto-updates on Incomes & Bank Expenses</p>
           </div>
 
           {/* 2. LIQUID / HAND MONEY */}
-          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
+          <div className="glass-panel p-3.5 rounded-2xl flex-shrink-0 w-[260px] md:w-[calc(25%-12px)] snap-center flex flex-col justify-between relative group transition-all duration-300">
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Hand Money</span>
-              <Coins className="h-5 w-5 text-sage" strokeWidth={1.75} />
+              <Coins className="h-4.5 w-4.5 text-sage" strokeWidth={1.75} />
             </div>
             
             {editingWalletId === 'wallet-hand' ? (
-              <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex items-center gap-1.5 mt-1">
                 <input
                   type="number"
                   value={editingWalletValue}
@@ -706,34 +732,34 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-2">
+              <div className="flex items-baseline justify-between mt-1">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer  transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {handMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className="p-2 text-sage transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
+                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Primary cash wallet for daily hand expenses</p>
+            <p className="text-[9px] text-sage/85 mt-1 leading-tight">Primary cash wallet for daily hand expenses</p>
           </div>
 
           {/* 3. SAVING MONEY */}
-          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
+          <div className="glass-panel p-3.5 rounded-2xl flex-shrink-0 w-[260px] md:w-[calc(25%-12px)] snap-center flex flex-col justify-between relative group transition-all duration-300">
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Saving Money</span>
-              <Wallet className="h-5 w-5 text-sage" strokeWidth={1.75} />
+              <Wallet className="h-4.5 w-4.5 text-sage" strokeWidth={1.75} />
             </div>
             
             {editingWalletId === 'wallet-savings' ? (
-              <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex items-center gap-1.5 mt-1">
                 <input
                   type="number"
                   value={editingWalletValue}
@@ -747,51 +773,51 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-2">
+              <div className="flex items-baseline justify-between mt-1">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
-                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer  transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {savingMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
-                  className="p-2 text-sage transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
+                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Accumulated vaults swept from cycles</p>
+            <p className="text-[9px] text-sage/85 mt-1 leading-tight">Accumulated vaults swept from cycles</p>
           </div>
 
           {/* 4. OPTION MONEY */}
-          <div className="glass-panel p-6 rounded-[24px] flex flex-col justify-between relative group transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
+          <div className="glass-panel p-3.5 rounded-2xl flex-shrink-0 w-[260px] md:w-[calc(25%-12px)] snap-center flex flex-col justify-between relative group transition-all duration-300">
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] uppercase font-bold tracking-wider text-sage">Option Money</span>
               <div className="flex gap-1 items-center">
                 <button 
                   type="button"
                   onClick={() => handleStepOptionMoney('dec')}
-                  className="bg-slate-100 border-none h-9 w-9 min-h-[36px] min-w-[36px] rounded-full flex items-center justify-center text-charcoal transition-all active:scale-90 cursor-pointer"
+                  className="bg-slate-100 dark:bg-slate-800 border-none h-6 w-6 min-h-[24px] min-w-[24px] rounded-full flex items-center justify-center text-charcoal dark:text-white transition-all active:scale-90 cursor-pointer"
                   title="Subtract Rs. 1,000"
                 >
-                  <Minus className="h-4 w-4" strokeWidth={2} />
+                  <Minus className="h-3 w-3" strokeWidth={2} />
                 </button>
                 <button 
                   type="button"
                   onClick={() => handleStepOptionMoney('inc')}
-                  className="bg-slate-100 border-none h-9 w-9 min-h-[36px] min-w-[36px] rounded-full flex items-center justify-center text-charcoal transition-all active:scale-90 cursor-pointer"
+                  className="bg-slate-100 dark:bg-slate-800 border-none h-6 w-6 min-h-[24px] min-w-[24px] rounded-full flex items-center justify-center text-charcoal dark:text-white transition-all active:scale-90 cursor-pointer"
                   title="Add Rs. 1,000"
                 >
-                  <Plus className="h-4 w-4" strokeWidth={2} />
+                  <Plus className="h-3 w-3" strokeWidth={2} />
                 </button>
               </div>
             </div>
             
             {editingWalletId === 'wallet-option' ? (
-              <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex items-center gap-1.5 mt-1">
                 <input
                   type="number"
                   value={editingWalletValue}
@@ -805,23 +831,23 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-2">
+              <div className="flex items-baseline justify-between mt-1">
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-option', optionMoney)}
-                  className={`text-xl md:text-2xl font-sans font-black text-charcoal tracking-tight cursor-pointer  transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
+                  className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {optionMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-option', optionMoney)}
-                  className="p-2 text-sage transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 cursor-pointer"
+                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
                 >
-                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[10px] text-sage/85 mt-2 leading-tight">Independent steerable ledger balance</p>
+            <p className="text-[9px] text-sage/85 mt-1 leading-tight">Independent steerable ledger balance</p>
           </div>
 
         </div>
@@ -1020,7 +1046,7 @@ export default function Dashboard() {
 
               <div className="space-y-3.5">
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-slate-muted block font-semibold">Payment Source</label>
+                  <label className="text-[10px] uppercase text-slate-muted block font-semibold">Payment Source / Destination</label>
                   <div className="flex border border-slate-border/50 rounded-lg p-0.5 bg-slate-50 dark:bg-[#22302C]">
                     <button
                       type="button"
@@ -1044,6 +1070,19 @@ export default function Dashboard() {
                     >
                       Bank Money
                     </button>
+                    {(editingTransaction?.type === 'income' || editingTransaction?.category === 'Adjustment') && (
+                      <button
+                        type="button"
+                        onClick={() => setEditSource('option')}
+                        className={`flex-1 py-3 text-xs font-semibold rounded transition-all min-h-[44px] active:scale-95 ${
+                          editSource === 'option'
+                            ? 'bg-black dark:bg-[#4DB6AC] text-white dark:text-[#0F1916] font-bold shadow'
+                            : 'text-slate-muted active:text-charcoal dark:active:text-white'
+                        }`}
+                      >
+                        Option Money
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1105,106 +1144,6 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
-      {/* CLOSEOUT CYCLES POPUP SIMULATOR MODAL */}
-      <AnimatePresence>
-        {showCloseoutModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowCloseoutModal(false)}
-              className="absolute inset-0 bg-black/75 backdrop-blur-sm"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel relative z-10 w-full max-w-md overflow-hidden p-6 space-y-4"
-            >
-              <div className="flex items-center justify-between border-b border-slate-border/50 pb-3">
-                <h3 className="font-bold text-lg text-charcoal dark:text-[#4DB6AC] uppercase flex items-center gap-1.5">
-                  <Sparkles className="h-5 w-5 text-charcoal dark:text-[#4DB6AC]" /> Closeout Summary
-                </h3>
-              </div>
-
-              <div className="space-y-2.5 text-sm bg-slate-50 dark:bg-[#22302C] p-4 rounded-lg border border-slate-border/30">
-                <div className="flex justify-between">
-                  <span className="text-slate-muted">Starting Budget:</span>
-                  <span className="font-mono font-medium text-charcoal dark:text-[#E0E0E0]">Rs. {totalCycleIncome.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-muted">Total Period Expenses:</span>
-                  <span className="font-mono text-rose-500 font-medium">-Rs. {cycleExpenses.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-border/30 pt-2 font-semibold">
-                  <span className="text-slate-muted">Remaining Balance:</span>
-                  <span className="font-mono text-charcoal dark:text-[#4DB6AC] font-bold">Rs. {remainingCycleBalance.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <p className="text-xs text-slate-muted leading-relaxed">
-                  Sweep remaining cycle liquid funds to Zurich Gold or another Savings goal vault:
-                </p>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase text-slate-muted block">Select Savings Goal</label>
-                  <select
-                    value={closeoutSweepBank}
-                    onChange={(e) => setCloseoutSweepBank(e.target.value)}
-                    className="glass-input w-full rounded-lg px-3 py-2.5 text-xs focus:border-charcoal dark:focus:border-[#4DB6AC]"
-                  >
-                    {savings
-                      .filter(s => s.id !== 'wallet-bank' && s.id !== 'wallet-hand' && s.id !== 'wallet-option')
-                      .map(s => (
-                        <option key={s.id} value={s.id} className="bg-white dark:bg-[#1B2623] text-charcoal dark:text-white">{s.name} (Bal: Rs. {s.current_balance.toLocaleString()})</option>
-                      ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase text-slate-muted block">Editable Sweep Amount (Rs.)</label>
-                  <input
-                    type="number"
-                    value={closeoutSweepAmount}
-                    onChange={(e) => setCloseoutSweepAmount(e.target.value)}
-                    className="glass-input w-full rounded-lg px-3 py-2.5 text-xs font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5 border-t border-slate-border/30 pt-3">
-                  <label className="text-[10px] uppercase text-slate-muted block">Next 10-Day Cycle Starting Income (Rs.)</label>
-                  <input
-                    type="number"
-                    value={nextCycleIncomeInput}
-                    onChange={(e) => setNextCycleIncomeInput(e.target.value)}
-                    className="glass-input w-full rounded-lg px-3 py-2.5 text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCloseoutModal(false)}
-                  className="flex-1 border border-slate-border py-3.5 rounded-lg text-xs font-semibold text-slate-muted active:text-charcoal dark:active:text-white active:bg-slate-100 dark:active:bg-[#22302C] transition-all active:scale-95 min-h-[44px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmCloseout}
-                  className="flex-1 bg-black dark:bg-[#4DB6AC] py-3.5 rounded-lg text-xs font-bold text-white dark:text-[#0F1916] transition-all active:scale-95 min-h-[44px]"
-                >
-                  Approve & Deposit
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* PRINT-ONLY BANK STATEMENT LAYOUT */}
       {printStatementMonth && (() => {
@@ -1590,11 +1529,13 @@ export default function Dashboard() {
                     {items.map(t => {
                       const isExpense = t.type === 'expense';
                       const isBank = t.description.startsWith('[Bank]');
+                      const isOption = t.description.startsWith('[Option]');
                       
                       // Remove prefix to clean rendering description
                       let descClean = t.description;
                       if (descClean.startsWith('[Bank]')) descClean = descClean.replace('[Bank]', '').trim();
                       if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
+                      if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
 
                       return (
                         <div 
@@ -1610,9 +1551,11 @@ export default function Dashboard() {
                               <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full font-bold ${
                                 isBank 
                                   ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
-                                  : 'bg-amber-50 text-amber-600 border border-amber-100/50'
+                                  : isOption
+                                    ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
+                                    : 'bg-amber-50 text-amber-600 border border-amber-100/50'
                               }`}>
-                                {isBank ? 'Bank' : 'Hand'}
+                                {isBank ? 'Bank' : isOption ? 'Option' : 'Hand'}
                               </span>
                               <span className="text-[9px] text-sage font-semibold">{t.category}</span>
                             </div>
@@ -1792,10 +1735,12 @@ export default function Dashboard() {
                         {items.map(t => {
                           const isExpense = t.type === 'expense';
                           const isBank = t.description.startsWith('[Bank]');
+                          const isOption = t.description.startsWith('[Option]');
                           
                           let descClean = t.description;
                           if (descClean.startsWith('[Bank]')) descClean = descClean.replace('[Bank]', '').trim();
                           if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
+                          if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
 
                           return (
                             <div 
@@ -1811,9 +1756,11 @@ export default function Dashboard() {
                                   <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full font-bold ${
                                     isBank 
                                       ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
-                                      : 'bg-amber-50 text-amber-600 border border-amber-100/50'
+                                      : isOption
+                                        ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
+                                        : 'bg-amber-50 text-amber-600 border border-amber-100/50'
                                   }`}>
-                                    {isBank ? 'Bank' : 'Hand'}
+                                    {isBank ? 'Bank' : isOption ? 'Option' : 'Hand'}
                                   </span>
                                   <span className="text-[9px] text-sage font-semibold">{t.category}</span>
                                 </div>
@@ -1854,22 +1801,88 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Closeout Simulation Trigger */}
-        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100/50 space-y-3">
-          <div className="flex items-center gap-1.5">
+        {/* Divided Closeout Simulator */}
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100/50 space-y-4">
+          <div className="flex items-center gap-1.5 border-b border-slate-200/50 pb-2.5">
             <Sparkles className="h-4.5 w-4.5 text-champagne" strokeWidth={1.75} />
-            <span className="text-xs font-bold text-charcoal">End-of-Cycle Pop-up Simulator</span>
+            <span className="text-xs font-bold text-charcoal">Simulator & Cycle Controls</span>
           </div>
-          <p className="text-[10px] text-sage leading-relaxed">
-            Trigger a 10th-day cycle rollover. Sweeps remaining liquid cash (Hand Money) to savings goals and creates a new cycle period.
-          </p>
-          <button
-            type="button"
-            onClick={handleTriggerCloseoutSimulator}
-            className="w-full bg-black py-3.5 rounded-full text-xs font-bold text-white transition-all active:scale-[0.98] min-h-[44px] cursor-pointer shadow-sm"
-          >
-            Simulate End of Cycle
-          </button>
+
+          {/* Action 1: Sweep Leftover Cash */}
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-wider text-sage font-bold block">1. Sweep Leftover Cash</span>
+            <div className="flex border border-slate-200 dark:border-slate-750 rounded-xl p-1 bg-white dark:bg-[#1B2623] shadow-sm">
+              <button
+                type="button"
+                onClick={() => setCloseoutSweepBank('wallet-bank')}
+                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all min-h-[32px] active:scale-95 cursor-pointer ${
+                  closeoutSweepBank === 'wallet-bank'
+                    ? 'bg-black text-white dark:bg-[#4DB6AC] dark:text-[#0F1916] shadow-sm font-extrabold'
+                    : 'text-sage'
+                }`}
+              >
+                Bank Money
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const firstSavingId = savings.find(s => s.id !== 'wallet-bank' && s.id !== 'wallet-hand' && s.id !== 'wallet-option')?.id || 's-1';
+                  setCloseoutSweepBank(firstSavingId);
+                }}
+                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all min-h-[32px] active:scale-95 cursor-pointer ${
+                  closeoutSweepBank !== 'wallet-bank'
+                    ? 'bg-black text-white dark:bg-[#4DB6AC] dark:text-[#0F1916] shadow-sm font-extrabold'
+                    : 'text-sage'
+                }`}
+              >
+                Saving Money
+              </button>
+            </div>
+            
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-sage font-bold">Rs.</span>
+                <input
+                  type="number"
+                  value={closeoutSweepAmount}
+                  onChange={(e) => setCloseoutSweepAmount(e.target.value)}
+                  className="w-full bg-white dark:bg-[#1B2623] border border-slate-205 dark:border-slate-750 rounded-xl pl-8 pr-3 py-2 text-xs font-sans text-charcoal dark:text-white focus:outline-none shadow-sm"
+                  placeholder="Sweep Amount"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handlePerformInlineSweep}
+                className="bg-black dark:bg-[#4DB6AC] text-white dark:text-[#0F1916] px-4 py-2 rounded-xl text-xs font-bold active:scale-[0.98] cursor-pointer shadow-sm"
+              >
+                Sweep
+              </button>
+            </div>
+          </div>
+
+          {/* Action 2: Start Next 10-Day Cycle */}
+          <div className="space-y-2 pt-3 border-t border-slate-200/50">
+            <span className="text-[10px] uppercase tracking-wider text-sage font-bold block">2. Start Next 10-Day Cycle</span>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-sage font-bold">Rs.</span>
+                <input
+                  type="number"
+                  value={nextCycleIncomeInput}
+                  onChange={(e) => setNextCycleIncomeInput(e.target.value)}
+                  className="w-full bg-white dark:bg-[#1B2623] border border-slate-205 dark:border-slate-750 rounded-xl pl-8 pr-3 py-2 text-xs font-sans text-charcoal dark:text-white focus:outline-none shadow-sm"
+                  placeholder="Starting Income"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handlePerformInlineStartNewCycle}
+                className="bg-black dark:bg-[#4DB6AC] text-white dark:text-[#0F1916] px-4 py-2 rounded-xl text-xs font-bold active:scale-[0.98] cursor-pointer shadow-sm"
+              >
+                Start
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -2073,11 +2086,13 @@ export default function Dashboard() {
                             {dayItems.map(t => {
                               const isExpense = t.type === 'expense';
                               const isBank = t.description.startsWith('[Bank]');
-                              const sourceLabel = isBank ? 'Bank' : 'Hand';
+                              const isOption = t.description.startsWith('[Option]');
+                              const sourceLabel = isBank ? 'Bank' : isOption ? 'Option' : 'Hand';
                               
                               let descClean = t.description;
                               if (descClean.startsWith('[Bank]')) descClean = descClean.replace('[Bank]', '').trim();
                               if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
+                              if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
 
                               return (
                                 <div 
@@ -2093,7 +2108,9 @@ export default function Dashboard() {
                                       <span className={`text-[7px] uppercase px-1 py-0.2 rounded font-bold ${
                                         isBank 
                                           ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
-                                          : 'bg-amber-50 text-amber-600 border border-amber-100/50'
+                                          : isOption
+                                            ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
+                                            : 'bg-amber-50 text-amber-600 border border-amber-100/50'
                                       }`}>
                                         {sourceLabel}
                                       </span>
