@@ -37,8 +37,10 @@ interface WalletContextType {
   addExpense: (amount: number, description: string, category: string, date: string, source?: 'hand' | 'bank') => Promise<void>;
   addIncome: (amount: number, description: string, destination: 'hand' | 'bank' | 'option', setCycle: boolean, startDate?: string, endDate?: string) => Promise<void>;
   addWithdrawal: (amount: number, date: string) => Promise<void>;
-  addDebt: (amount: number, personName: string, type: 'lent' | 'borrowed', description: string) => Promise<void>;
+  addDebt: (amount: number, personName: string, type: 'lent' | 'borrowed', description: string, source?: 'hand' | 'bank') => Promise<void>;
   settleDebt: (debtId: string, settleAmount: number, source?: 'hand' | 'bank') => Promise<void>;
+  deleteDebt: (id: string) => Promise<void>;
+  editDebt: (id: string, amount: number, personName: string, type: 'lent' | 'borrowed', description: string) => Promise<void>;
   reconcileCash: (actualCash: number) => Promise<void>;
   incrementCommute: (category: 'Travel (Colombo)' | 'Travel (Home)', cost: number) => Promise<void>;
   decrementCommute: (category: 'Travel (Colombo)' | 'Travel (Home)') => Promise<void>;
@@ -436,7 +438,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Add Debt (receivable/payable)
-  const addDebt = async (amount: number, personName: string, type: 'lent' | 'borrowed', description: string) => {
+  const addDebt = async (
+    amount: number,
+    personName: string,
+    type: 'lent' | 'borrowed',
+    description: string,
+    source: 'hand' | 'bank' = 'hand'
+  ) => {
     const finalAmount = type === 'lent' ? Math.abs(amount) : -Math.abs(amount);
     
     const newDebt: Debt = {
@@ -448,17 +456,92 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       created_at: new Date().toISOString(),
     };
 
+    // Calculate balance changes
+    const walletId = source === 'bank' ? 'wallet-bank' : 'wallet-hand';
+    const currentWalletObj = savings.find(s => s.id === walletId);
+    const currentBalance = currentWalletObj ? currentWalletObj.current_balance : 0;
+    
+    // Lent decreases wallet balance; Borrowed increases wallet balance
+    const balanceChange = type === 'lent' ? -Math.abs(amount) : Math.abs(amount);
+    const newWalletBalance = currentBalance + balanceChange;
+
+    const updatedSavings = savings.map(s => s.id === walletId ? { ...s, current_balance: newWalletBalance } : s);
+    setSavings(updatedSavings);
+
+    // Create a transaction record to log the debt creation event
+    const newTransaction: Transaction = {
+      id: Math.random().toString(36).substring(2, 9),
+      cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
+      amount: balanceChange,
+      type: type === 'lent' ? 'expense' : 'income',
+      category: 'General',
+      description: `[${source === 'bank' ? 'Bank' : 'Hand'}] ${type === 'lent' ? 'Lent money to' : 'Borrowed money from'} ${personName}${description ? ' - ' + description : ''}`,
+      date: new Date().toISOString().split('T')[0],
+      created_at: new Date().toISOString(),
+    };
+
+    const updatedTransactions = [newTransaction, ...transactions];
+    setTransactions(updatedTransactions);
+
     if (isSupabaseConfigured() && supabase) {
       try {
         await client.from('debts').insert(newDebt as any);
+        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+        await client.from('transactions').insert(newTransaction as any);
       } catch (err) {
         console.error("Supabase debt insert error:", err);
       }
     }
 
-    const updated = [newDebt, ...debts];
-    setDebts(updated);
-    saveStateToLocal(cycles, transactions, updated, savings);
+    const updatedDebts = [newDebt, ...debts];
+    setDebts(updatedDebts);
+    saveStateToLocal(cycles, updatedTransactions, updatedDebts, updatedSavings);
+  };
+
+  // Delete Debt
+  const deleteDebt = async (id: string) => {
+    const updatedDebts = debts.filter(d => d.id !== id);
+    setDebts(updatedDebts);
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await client.from('debts').delete().eq('id', id);
+      } catch (err) {
+        console.error("Supabase delete debt error:", err);
+      }
+    }
+    saveStateToLocal(cycles, transactions, updatedDebts, savings);
+  };
+
+  // Edit Debt
+  const editDebt = async (
+    id: string,
+    amount: number,
+    personName: string,
+    type: 'lent' | 'borrowed',
+    description: string
+  ) => {
+    const finalAmount = type === 'lent' ? Math.abs(amount) : -Math.abs(amount);
+    const updatedDebts = debts.map(d => 
+      d.id === id 
+        ? { ...d, amount: finalAmount, person_name: personName, type, description: description || null } 
+        : d
+    );
+    setDebts(updatedDebts);
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await client.from('debts').update({
+          amount: finalAmount,
+          person_name: personName,
+          type,
+          description: description || null
+        } as any).eq('id', id);
+      } catch (err) {
+        console.error("Supabase edit debt error:", err);
+      }
+    }
+    saveStateToLocal(cycles, transactions, updatedDebts, savings);
   };
 
   // Settle Debt (increases chosen wallet if they pay us back; decreases chosen wallet if we pay them)
@@ -984,6 +1067,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addWithdrawal,
       addDebt,
       settleDebt,
+      deleteDebt,
+      editDebt,
       reconcileCash,
       incrementCommute,
       decrementCommute,

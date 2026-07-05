@@ -48,6 +48,7 @@ export default function FABModal() {
   // Debt states
   const [personName, setPersonName] = useState('');
   const [debtType, setDebtType] = useState<'lent' | 'borrowed'>('lent');
+  const [debtSource, setDebtSource] = useState<'hand' | 'bank'>('hand');
 
   // Adjustment states
   const [adjustmentWallet, setAdjustmentWallet] = useState<'wallet-bank' | 'wallet-hand' | 'wallet-option'>('wallet-hand');
@@ -63,6 +64,7 @@ export default function FABModal() {
     setIncomeDestination('bank');
     setPersonName('');
     setDebtType('lent');
+    setDebtSource('hand');
     setActualBalance('');
   };
 
@@ -103,7 +105,7 @@ export default function FABModal() {
       } else if (activeTab === 'debt') {
         const numAmount = parseFloat(amount);
         if (isNaN(numAmount) || numAmount <= 0 || !personName.trim()) return;
-        await addDebt(numAmount, personName.trim(), debtType, description);
+        await addDebt(numAmount, personName.trim(), debtType, description, debtSource);
       } else if (activeTab === 'adjustment') {
         const numActual = parseFloat(actualBalance);
         if (isNaN(numActual)) return;
@@ -431,6 +433,33 @@ export default function FABModal() {
                           onChange={(e) => setPersonName(e.target.value)}
                           className="glass-input w-full rounded-xl pl-10 pr-4 py-3 text-sm placeholder:text-slate-400/60"
                         />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Wallet Source / Destination</label>
+                      <div className="flex gap-4">
+                         <label className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-100 dark:border-slate-700/50 min-h-[44px] py-3 cursor-pointer bg-slate-50 dark:bg-[#22302C] transition-all active:scale-95 active:border-slate-200">
+                          <input
+                            type="radio"
+                            name="debtSource"
+                            checked={debtSource === 'hand'}
+                            onChange={() => setDebtSource('hand')}
+                            className="accent-black dark:accent-[#4DB6AC]"
+                          />
+                          <span className={`text-xs font-bold ${debtSource === 'hand' ? 'text-charcoal dark:text-white font-black' : 'text-sage'}`}>Hand Money</span>
+                        </label>
+
+                        <label className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-100 dark:border-slate-700/50 min-h-[44px] py-3 cursor-pointer bg-slate-50 dark:bg-[#22302C] transition-all active:scale-95 active:border-slate-200">
+                          <input
+                            type="radio"
+                            name="debtSource"
+                            checked={debtSource === 'bank'}
+                            onChange={() => setDebtSource('bank')}
+                            className="accent-black dark:accent-[#4DB6AC]"
+                          />
+                          <span className={`text-xs font-bold ${debtSource === 'bank' ? 'text-charcoal dark:text-white font-black' : 'text-sage'}`}>Bank Money</span>
+                        </label>
                       </div>
                     </div>
 

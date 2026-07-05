@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '../context/WalletContext';
 import FABModal from '../components/FABModal';
-import { Transaction } from '../supabase-types';
+import { Transaction, Debt } from '../supabase-types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
   Wallet, 
@@ -69,7 +69,9 @@ export default function Dashboard() {
     closeActiveCycleAndSweep,
     updateActiveCycleIncome,
     editTransaction,
-    deleteTransaction
+    deleteTransaction,
+    editDebt,
+    deleteDebt
   } = useWallet();
 
   // Active view tab state (for mobile viewport tab rendering)
@@ -361,6 +363,42 @@ export default function Dashboard() {
     setEditingTransaction(null);
   };
 
+  // Debt Edit Modal state
+  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [editDebtAmount, setEditDebtAmount] = useState('');
+  const [editDebtPersonName, setEditDebtPersonName] = useState('');
+  const [editDebtType, setEditDebtType] = useState<'lent' | 'borrowed'>('lent');
+  const [editDebtDescription, setEditDebtDescription] = useState('');
+
+  const handleStartEditDebt = (d: Debt) => {
+    setEditingDebt(d);
+    setEditDebtAmount(Math.abs(d.amount).toString());
+    setEditDebtPersonName(d.person_name);
+    setEditDebtType(d.type);
+    setEditDebtDescription(d.description || '');
+  };
+
+  const handleSaveDebtEdit = async () => {
+    if (!editingDebt) return;
+    const numAmt = parseFloat(editDebtAmount);
+    if (isNaN(numAmt) || numAmt <= 0 || !editDebtPersonName.trim()) return;
+
+    await editDebt(
+      editingDebt.id,
+      numAmt,
+      editDebtPersonName.trim(),
+      editDebtType,
+      editDebtDescription
+    );
+    setEditingDebt(null);
+  };
+
+  const handleDeleteDebt = async (id: string) => {
+    if (confirm("Are you sure you want to delete this trust ledger? This will remove the debt record.")) {
+      await deleteDebt(id);
+    }
+  };
+
   // Grouping transactions by Date Timeline
   const groupTransactionsByDate = (transList: Transaction[]) => {
     const groups: { [key: string]: Transaction[] } = {};
@@ -585,6 +623,57 @@ export default function Dashboard() {
   };
 
   const handleItemMouseUp = () => {
+    setItemTouchStart(null);
+  };
+
+  // Swiped debt state in Trust Ledger
+  const [swipedDebtId, setSwipedDebtId] = useState<string | null>(null);
+
+  const handleDebtTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    setItemTouchStart(e.touches[0].clientX);
+  };
+
+  const handleDebtTouchMove = (e: React.TouchEvent, id: string) => {
+    e.stopPropagation();
+    if (itemTouchStart === null) return;
+    const currentX = e.touches[0].clientX;
+    const diffX = itemTouchStart - currentX;
+    
+    // Swipe left to open edit options
+    if (diffX > 45) {
+      setSwipedDebtId(id);
+    }
+    // Swipe right to close/hide edit options
+    if (diffX < -45) {
+      if (swipedDebtId === id) {
+        setSwipedDebtId(null);
+      }
+    }
+  };
+
+  const handleDebtTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    setItemTouchStart(null);
+  };
+
+  const handleDebtMouseDown = (e: React.MouseEvent) => {
+    setItemTouchStart(e.clientX);
+  };
+
+  const handleDebtMouseMove = (e: React.MouseEvent, id: string) => {
+    if (itemTouchStart === null) return;
+    const diffX = itemTouchStart - e.clientX;
+    if (diffX > 45) {
+      setSwipedDebtId(id);
+    } else if (diffX < -45) {
+      if (swipedDebtId === id) {
+        setSwipedDebtId(null);
+      }
+    }
+  };
+
+  const handleDebtMouseUp = () => {
     setItemTouchStart(null);
   };
 
@@ -1197,6 +1286,109 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
+      {/* DEBT EDIT MODAL */}
+      <AnimatePresence>
+        {editingDebt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-panel w-full max-w-md p-6 space-y-4 shadow-lg border border-slate-border text-left"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-slate-border/50">
+                <h3 className="text-sm font-black uppercase text-charcoal dark:text-white flex items-center gap-1.5">
+                  <Edit3 className="h-4 w-4 text-gold-glow" /> Edit Trust Ledger
+                </h3>
+                <button
+                  onClick={() => setEditingDebt(null)}
+                  className="p-1 rounded-full text-slate-muted hover:bg-slate-100 dark:hover:bg-[#22302C] active:scale-95 transition-all cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-slate-muted block font-semibold">Amount (Rs.)</label>
+                  <input
+                    type="number"
+                    value={editDebtAmount}
+                    onChange={(e) => setEditDebtAmount(e.target.value)}
+                    className="glass-input w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-slate-muted block font-semibold">Person Name</label>
+                  <input
+                    type="text"
+                    value={editDebtPersonName}
+                    onChange={(e) => setEditDebtPersonName(e.target.value)}
+                    className="glass-input w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-slate-muted block font-semibold">Relationship</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditDebtType('lent')}
+                      className={`flex-1 py-2 text-xs font-semibold rounded transition-all active:scale-95 border border-slate-200 dark:border-slate-700/50 ${
+                        editDebtType === 'lent'
+                          ? 'bg-black dark:bg-[#4DB6AC] text-white dark:text-[#0F1916] font-bold shadow'
+                          : 'text-slate-muted active:text-charcoal dark:active:text-white'
+                      }`}
+                    >
+                      Lent
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditDebtType('borrowed')}
+                      className={`flex-1 py-2 text-xs font-semibold rounded transition-all active:scale-95 border border-slate-200 dark:border-slate-700/50 ${
+                        editDebtType === 'borrowed'
+                          ? 'bg-rose-500 text-white font-bold shadow'
+                          : 'text-slate-muted active:text-charcoal dark:active:text-white'
+                      }`}
+                    >
+                      Borrowed
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase text-slate-muted block font-semibold">Reason / Description</label>
+                  <input
+                    type="text"
+                    value={editDebtDescription}
+                    onChange={(e) => setEditDebtDescription(e.target.value)}
+                    className="glass-input w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingDebt(null)}
+                  className="flex-1 border border-slate-border py-3.5 rounded-lg text-xs font-semibold text-slate-muted active:text-charcoal dark:active:text-white active:bg-slate-100 dark:active:bg-[#22302C] transition-all active:scale-95 min-h-[44px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDebtEdit}
+                  className="flex-1 bg-black dark:bg-[#4DB6AC] py-3.5 rounded-lg text-xs font-bold text-white dark:text-[#0F1916] transition-all active:scale-95 min-h-[44px]"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
 
       {/* PRINT-ONLY BANK STATEMENT LAYOUT */}
       {printStatementMonth && (() => {
@@ -1451,91 +1643,149 @@ export default function Dashboard() {
             ) : (
               debts.map((d) => {
                 const isLent = d.amount > 0;
+                const isSwiped = swipedDebtId === d.id;
                 return (
-                  <div key={d.id} className="bg-obsidian/30 p-3 rounded-lg border border-slate-border/20 space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-charcoal dark:text-[#E0E0E0]">{d.person_name}</span>
-                      <span className={`font-mono text-xs font-semibold ${isLent ? 'text-emerald' : 'text-crimson'}`}>
-                        {isLent ? '+' : '-'}Rs. {Math.abs(d.amount).toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-[9px]">
-                      <span className={isLent ? 'text-emerald' : 'text-crimson'}>
-                        {isLent ? 'Lent (Receivable)' : 'Borrowed (Payable)'}
-                      </span>
-                      
-                      {settlingDebtId !== d.id && (
+                  <div 
+                    key={d.id} 
+                    onTouchStart={handleDebtTouchStart}
+                    onTouchMove={(e) => handleDebtTouchMove(e, d.id)}
+                    onTouchEnd={handleDebtTouchEnd}
+                    onMouseDown={handleDebtMouseDown}
+                    onMouseMove={(e) => handleDebtMouseMove(e, d.id)}
+                    onMouseUp={handleDebtMouseUp}
+                    onMouseLeave={handleDebtMouseUp}
+                    className="relative overflow-hidden rounded-lg border border-slate-border/20 bg-obsidian/30 select-none"
+                  >
+                    {/* Swipe edit/delete buttons underneath */}
+                    <div 
+                      className="absolute right-0 top-0 bottom-0 flex items-center bg-slate-50 dark:bg-[#1B2623] transition-all duration-300 z-10"
+                      style={{
+                        width: isSwiped ? '80px' : '0px',
+                        opacity: isSwiped ? 1 : 0,
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div className="flex items-center justify-center w-full h-full gap-2 px-1">
                         <button
+                          type="button"
                           onClick={() => {
-                            setSettlingDebtId(d.id);
-                            setSettleAmount(Math.abs(d.amount).toString());
-                            setSettleSource('hand');
+                            handleStartEditDebt(d);
+                            setSwipedDebtId(null);
                           }}
-                          className="text-[9px] uppercase font-bold text-champagne active:underline transition-all min-h-[44px] px-3.5 flex items-center justify-center active:scale-95"
+                          className="p-1.5 text-sage hover:text-charcoal dark:hover:text-white rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
+                          title="Edit trust ledger"
                         >
-                          Settle
+                          <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleDeleteDebt(d.id);
+                            setSwipedDebtId(null);
+                          }}
+                          className="p-1.5 text-rose-500 hover:text-rose-700 rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
+                          title="Delete trust ledger"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+                        </button>
+                      </div>
                     </div>
 
-                    {settlingDebtId === d.id && (
-                      <div className="mt-2 p-2 bg-obsidian/60 rounded border border-slate-border/30 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Settle Amount</label>
-                          <input
-                            type="number"
-                            placeholder="Amount"
-                            value={settleAmount}
-                            onChange={(e) => setSettleAmount(e.target.value)}
-                            className="w-24 bg-slate-50 dark:bg-[#1B2623] text-[10px] text-charcoal dark:text-[#E0E0E0] border border-slate-200 dark:border-slate-700/50 rounded px-1.5 py-1 focus:outline-none font-mono"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Wallet Source</label>
-                          <div className="flex border border-slate-border/50 rounded bg-obsidian/30 p-0.5">
+                    {/* Main Content card */}
+                    <div 
+                      className="p-3 space-y-1.5 transition-transform duration-300"
+                      style={{
+                        transform: isSwiped ? 'translateX(-80px)' : 'translateX(0px)'
+                      }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-semibold text-charcoal dark:text-[#E0E0E0]">{d.person_name}</span>
+                        <span className={`font-mono text-xs font-semibold ${isLent ? 'text-emerald' : 'text-crimson'}`}>
+                          {isLent ? '+' : '-'}Rs. {Math.abs(d.amount).toLocaleString()}
+                        </span>
+                      </div>
+
+                      {d.description && (
+                        <p className="text-[10px] text-slate-muted italic">{d.description}</p>
+                      )}
+
+                      <div className="flex justify-between items-center text-[9px]">
+                        <span className={isLent ? 'text-emerald' : 'text-crimson'}>
+                          {isLent ? 'Lent (Receivable)' : 'Borrowed (Payable)'}
+                        </span>
+                        
+                        {settlingDebtId !== d.id && (
+                          <button
+                            onClick={() => {
+                              setSettlingDebtId(d.id);
+                              setSettleAmount(Math.abs(d.amount).toString());
+                              setSettleSource('hand');
+                            }}
+                            className="text-[9px] uppercase font-bold text-champagne active:underline transition-all min-h-[44px] px-3.5 flex items-center justify-center active:scale-95"
+                          >
+                            Settle
+                          </button>
+                        )}
+                      </div>
+
+                      {settlingDebtId === d.id && (
+                        <div className="mt-2 p-2 bg-obsidian/60 rounded border border-slate-border/30 space-y-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2">
+                            <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Settle Amount</label>
+                            <input
+                              type="number"
+                              placeholder="Amount"
+                              value={settleAmount}
+                              onChange={(e) => setSettleAmount(e.target.value)}
+                              className="w-24 bg-slate-50 dark:bg-[#1B2623] text-[10px] text-charcoal dark:text-[#E0E0E0] border border-slate-200 dark:border-slate-700/50 rounded px-1.5 py-1 focus:outline-none font-mono"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Wallet Source</label>
+                            <div className="flex border border-slate-border/50 rounded bg-obsidian/30 p-0.5">
+                              <button
+                                type="button"
+                                onClick={() => setSettleSource('hand')}
+                                className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
+                                  settleSource === 'hand'
+                                    ? 'bg-champagne text-obsidian'
+                                    : 'text-slate-muted active:text-white'
+                                }`}
+                              >
+                                Hand
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSettleSource('bank')}
+                                className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
+                                  settleSource === 'bank'
+                                    ? 'bg-champagne text-obsidian'
+                                    : 'text-slate-muted active:text-white'
+                                }`}
+                              >
+                                Bank
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 justify-end">
                             <button
                               type="button"
-                              onClick={() => setSettleSource('hand')}
-                              className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
-                                settleSource === 'hand'
-                                  ? 'bg-champagne text-obsidian'
-                                  : 'text-slate-muted active:text-white'
-                              }`}
+                              onClick={() => setSettlingDebtId(null)}
+                              className="text-slate-muted text-[10px] border border-slate-border/30 px-2 py-0.5 rounded active:scale-95 transition-all"
                             >
-                              Hand
+                              Cancel
                             </button>
                             <button
                               type="button"
-                              onClick={() => setSettleSource('bank')}
-                              className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
-                                settleSource === 'bank'
-                                  ? 'bg-champagne text-obsidian'
-                                  : 'text-slate-muted active:text-white'
-                              }`}
+                              onClick={() => handleSettleDebt(d.id)}
+                              className="bg-champagne text-obsidian text-[10px] font-bold px-3.5 py-0.5 rounded shadow-gold-glow active:scale-95 transition-all"
                             >
-                              Bank
+                              Pay
                             </button>
                           </div>
                         </div>
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            type="button"
-                            onClick={() => setSettlingDebtId(null)}
-                            className="text-slate-muted text-[10px] border border-slate-border/30 px-2 py-0.5 rounded active:scale-95 transition-all"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSettleDebt(d.id)}
-                            className="bg-champagne text-obsidian text-[10px] font-bold px-3.5 py-0.5 rounded shadow-gold-glow active:scale-95 transition-all"
-                          >
-                            Pay
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -2163,7 +2413,7 @@ export default function Dashboard() {
                                 >
                                   {/* Action Buttons underneath */}
                                   <div 
-                                    className="absolute right-0 top-0 bottom-0 flex items-center bg-slate-50 dark:bg-slate-800 transition-all duration-305 z-10"
+                                    className="absolute right-0 top-0 bottom-0 flex items-center bg-slate-50 dark:bg-[#1B2623] transition-all duration-305 z-10"
                                     style={{
                                       width: isSwiped ? '80px' : '0px',
                                       opacity: isSwiped ? 1 : 0,
@@ -2177,7 +2427,7 @@ export default function Dashboard() {
                                           handleStartEditTransaction(t);
                                           setSwipedTransactionId(null);
                                         }}
-                                        className="p-1.5 text-sage hover:text-charcoal dark:hover:text-white rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-slate-700 shadow-sm border border-slate-100"
+                                        className="p-1.5 text-sage hover:text-charcoal dark:hover:text-white rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
                                         title="Edit transaction"
                                       >
                                         <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
@@ -2188,7 +2438,7 @@ export default function Dashboard() {
                                           handleDeleteTransaction(t.id);
                                           setSwipedTransactionId(null);
                                         }}
-                                        className="p-1.5 text-rose-500 hover:text-rose-700 rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-slate-700 shadow-sm border border-slate-100"
+                                        className="p-1.5 text-rose-500 hover:text-rose-700 rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
                                         title="Delete transaction"
                                       >
                                         <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
