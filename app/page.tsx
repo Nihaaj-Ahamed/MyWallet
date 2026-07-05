@@ -74,6 +74,16 @@ export default function Dashboard() {
     deleteDebt
   } = useWallet();
 
+  // Calculate total outstanding debts for Bank and Hand Money
+  // Lent = positive, Borrowed = negative
+  const bankDebtsTotal = debts
+    .filter(d => d.description?.startsWith('[Bank]'))
+    .reduce((sum, d) => sum + d.amount, 0);
+
+  const handDebtsTotal = debts
+    .filter(d => !d.description?.startsWith('[Bank]')) // everything else defaults to hand
+    .reduce((sum, d) => sum + d.amount, 0);
+
   // Active view tab state (for mobile viewport tab rendering)
   const [activeMobileTab, setActiveMobileTab] = useState<number>(1); // Default to Today Ledger (Tab 2)
 
@@ -246,19 +256,19 @@ export default function Dashboard() {
     : [];
   const cycleBaseIncome = activeCycle?.income || 0;
   const cycleExtraIncome = cycleTransactions
-    .filter(t => t.type === 'income')
+    .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
     .reduce((sum, t) => sum + t.amount, 0);
   const totalCycleIncome = cycleBaseIncome + cycleExtraIncome;
 
   const cycleExpenses = cycleTransactions
-    .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep')
+    .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
   const remainingCycleBalance = handMoney;
 
   // Active month total income (base + extra incomes)
   const activeMonthIncome = activeTransactions
-    .filter(t => t.type === 'income')
+    .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
     .reduce((sum, t) => sum + t.amount, 0);
 
   // Toggle monthly accordions
@@ -843,13 +853,20 @@ export default function Dashboard() {
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
+                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-95 cursor-pointer"
                 >
                   <Pencil className="h-3 w-3" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[9px] text-sage/85 mt-1 leading-tight">Auto-updates on Incomes & Bank Expenses</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-[9px] text-sage/85 leading-tight">Auto-updates on Incomes & Bank Expenses</p>
+              {bankDebtsTotal !== 0 && (
+                <span className={`text-[9px] font-mono font-bold ${bankDebtsTotal > 0 ? 'text-emerald-500 dark:text-[#4DB6AC]' : 'text-crimson dark:text-rose-400'}`}>
+                  {bankDebtsTotal > 0 ? '+' : '-'}Rs. {Math.abs(bankDebtsTotal).toLocaleString()}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* 2. LIQUID / HAND MONEY */}
@@ -884,13 +901,20 @@ export default function Dashboard() {
                 <button 
                   type="button"
                   onClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
+                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-95 cursor-pointer"
                 >
                   <Pencil className="h-3 w-3" strokeWidth={1.75} />
                 </button>
               </div>
             )}
-            <p className="text-[9px] text-sage/85 mt-1 leading-tight">Primary cash wallet for daily hand expenses</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-[9px] text-sage/85 leading-tight">Primary cash wallet for daily hand expenses</p>
+              {handDebtsTotal !== 0 && (
+                <span className={`text-[9px] font-mono font-bold ${handDebtsTotal > 0 ? 'text-emerald-500 dark:text-[#4DB6AC]' : 'text-crimson dark:text-rose-400'}`}>
+                  {handDebtsTotal > 0 ? '+' : '-'}Rs. {Math.abs(handDebtsTotal).toLocaleString()}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* 3. SAVING MONEY */}
@@ -2244,11 +2268,11 @@ export default function Dashboard() {
     const monthTransactions = transactions.filter(t => t.date && t.date.startsWith(monthPrefix));
     
     const monthIncome = monthTransactions
-      .filter(t => t.type === 'income')
+      .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
       .reduce((sum, t) => sum + t.amount, 0);
 
     const monthExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep')
+      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const monthSweeps = monthTransactions

@@ -33,7 +33,7 @@ export interface Database {
           cycle_id: string;
           amount: number;      // Negative for expenses, positive for income
           type: 'expense' | 'income' | 'adjustment';
-          category: 'Food' | 'Travel (Colombo)' | 'Travel (Home)' | 'Rent' | 'Electricity' | 'General' | 'Cycle Income' | 'Adjustment' | 'Debt Settlement' | 'Savings Sweep';
+          category: 'Food' | 'Travel (Colombo)' | 'Travel (Home)' | 'Rent' | 'Electricity' | 'General' | 'Cycle Income' | 'Adjustment' | 'Debt' | 'Debt Settlement' | 'Savings Sweep';
           description: string;
           date: string;        // ISO Date String YYYY-MM-DD
           created_at: string;
@@ -43,7 +43,7 @@ export interface Database {
           cycle_id: string;
           amount: number;
           type: 'expense' | 'income' | 'adjustment';
-          category: 'Food' | 'Travel (Colombo)' | 'Travel (Home)' | 'Rent' | 'Electricity' | 'General' | 'Cycle Income' | 'Adjustment' | 'Debt Settlement' | 'Savings Sweep';
+          category: 'Food' | 'Travel (Colombo)' | 'Travel (Home)' | 'Rent' | 'Electricity' | 'General' | 'Cycle Income' | 'Adjustment' | 'Debt' | 'Debt Settlement' | 'Savings Sweep';
           description: string;
           date: string;
           created_at?: string;
@@ -53,7 +53,7 @@ export interface Database {
           cycle_id?: string;
           amount?: number;
           type?: 'expense' | 'income' | 'adjustment';
-          category?: 'Food' | 'Travel (Colombo)' | 'Travel (Home)' | 'Rent' | 'Electricity' | 'General' | 'Cycle Income' | 'Adjustment' | 'Debt Settlement' | 'Savings Sweep';
+          category?: 'Food' | 'Travel (Colombo)' | 'Travel (Home)' | 'Rent' | 'Electricity' | 'General' | 'Cycle Income' | 'Adjustment' | 'Debt' | 'Debt Settlement' | 'Savings Sweep';
           description?: string;
           date?: string;
           created_at?: string;

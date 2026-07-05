@@ -452,7 +452,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       person_name: personName,
       amount: finalAmount,
       type,
-      description: description || null,
+      description: `[${source === 'bank' ? 'Bank' : 'Hand'}] ${description || ''}`.trim(),
       created_at: new Date().toISOString(),
     };
 
@@ -474,7 +474,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
       amount: balanceChange,
       type: type === 'lent' ? 'expense' : 'income',
-      category: 'General',
+      category: 'Debt',
       description: `[${source === 'bank' ? 'Bank' : 'Hand'}] ${type === 'lent' ? 'Lent money to' : 'Borrowed money from'} ${personName}${description ? ' - ' + description : ''}`,
       date: new Date().toISOString().split('T')[0],
       created_at: new Date().toISOString(),
@@ -522,9 +522,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     description: string
   ) => {
     const finalAmount = type === 'lent' ? Math.abs(amount) : -Math.abs(amount);
+    
+    // Find existing debt to preserve its [Bank] or [Hand] prefix
+    const existingDebt = debts.find(d => d.id === id);
+    const existingSource = existingDebt?.description?.startsWith('[Bank]') ? 'Bank' : 'Hand';
+    const finalDescription = `[${existingSource}] ${description || ''}`.trim();
+
     const updatedDebts = debts.map(d => 
       d.id === id 
-        ? { ...d, amount: finalAmount, person_name: personName, type, description: description || null } 
+        ? { ...d, amount: finalAmount, person_name: personName, type, description: finalDescription } 
         : d
     );
     setDebts(updatedDebts);
@@ -535,7 +541,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           amount: finalAmount,
           person_name: personName,
           type,
-          description: description || null
+          description: finalDescription
         } as any).eq('id', id);
       } catch (err) {
         console.error("Supabase edit debt error:", err);
