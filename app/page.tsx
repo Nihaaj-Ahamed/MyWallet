@@ -98,6 +98,61 @@ export default function Dashboard() {
   const [sweepingBankId, setSweepingBankId] = useState<string | null>(null);
   const [sweepAmount, setSweepAmount] = useState('');
 
+  // Notebook scratchpad state
+  const [notebookText, setNotebookText] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('vault_notebook') || '';
+    }
+    return '';
+  });
+  const [isSavingNotebook, setIsSavingNotebook] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('vault_notebook', notebookText);
+      setIsSavingNotebook(true);
+      const timer = setTimeout(() => setIsSavingNotebook(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [notebookText]);
+
+  const [copiedNotebook, setCopiedNotebook] = useState(false);
+
+  const handleCopyNotebook = () => {
+    if (typeof window !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(notebookText);
+      setCopiedNotebook(true);
+      setTimeout(() => setCopiedNotebook(false), 1500);
+    }
+  };
+
+  const handleClearNotebook = () => {
+    if (confirm("Are you sure you want to clear the notebook?")) {
+      setNotebookText('');
+    }
+  };
+
+  const handleAddNotebookTag = (tag: string) => {
+    const textarea = document.getElementById('vault-notebook-textarea') as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      const before = text.substring(0, start);
+      const after = text.substring(end);
+      const insert = (start > 0 && text[start - 1] !== '\n') ? ` ${tag}` : tag;
+      const newText = before + insert + after;
+      setNotebookText(newText);
+      
+      setTimeout(() => {
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = start + insert.length;
+      }, 50);
+    } else {
+      setNotebookText(prev => prev + (prev.length > 0 ? ' ' : '') + tag);
+    }
+  };
+
   // 10-Day Cycle closing simulation state
   const [closeoutSweepAmount, setCloseoutSweepAmount] = useState('');
   const [closeoutSweepBank, setCloseoutSweepBank] = useState('');
@@ -1835,6 +1890,149 @@ export default function Dashboard() {
                 );
               })
             )}
+          </div>
+        </div>
+
+        {/* Quick Notebook Section */}
+        <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800/40">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-1.5">
+              <Edit3 className="h-4 w-4 text-sage" strokeWidth={2} />
+              <h4 className="text-xs uppercase text-slate-muted font-bold tracking-wider">Vault Scratchpad</h4>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {isSavingNotebook ? (
+                <span className="flex items-center gap-1 text-[9px] font-mono text-amber-500 font-bold">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Saving
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[9px] font-mono text-emerald font-bold">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
+                  Auto-saved
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="glass-panel p-3.5 rounded-2xl bg-white dark:bg-[#151D1B] border border-slate-100 dark:border-slate-800/50 shadow-sm space-y-3">
+            {/* Quick Action Tags Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[9px] font-mono scroll-smooth">
+              <button
+                type="button"
+                onClick={() => {
+                  const today = new Date();
+                  const dateStr = `[${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}]: `;
+                  handleAddNotebookTag(dateStr);
+                }}
+                className="bg-slate-100 dark:bg-[#1C2623] hover:bg-slate-200 dark:hover:bg-slate-800 text-charcoal dark:text-white px-2 py-1 rounded border border-slate-200/50 dark:border-slate-700/50 flex-shrink-0 cursor-pointer active:scale-95 transition-all font-semibold"
+              >
+                + Date
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddNotebookTag('[TODO] ')}
+                className="bg-slate-100 dark:bg-[#1C2623] hover:bg-slate-200 dark:hover:bg-slate-800 text-charcoal dark:text-white px-2 py-1 rounded border border-slate-200/50 dark:border-slate-700/50 flex-shrink-0 cursor-pointer active:scale-95 transition-all font-semibold"
+              >
+                + Todo
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddNotebookTag('[SETTLE] ')}
+                className="bg-slate-100 dark:bg-[#1C2623] hover:bg-slate-200 dark:hover:bg-slate-800 text-charcoal dark:text-white px-2 py-1 rounded border border-slate-200/50 dark:border-slate-700/50 flex-shrink-0 cursor-pointer active:scale-95 transition-all font-semibold"
+              >
+                + Settle
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddNotebookTag('[URGENT] ')}
+                className="bg-red-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 px-2 py-1 rounded border border-red-100 dark:border-rose-900/40 flex-shrink-0 cursor-pointer active:scale-95 transition-all font-semibold"
+              >
+                + Urgent
+              </button>
+              <div className="w-[1px] h-3 bg-slate-200 dark:bg-slate-800 flex-shrink-0 mx-0.5" />
+              <button
+                type="button"
+                onClick={() => handleAddNotebookTag('Rs. 500')}
+                className="bg-slate-50 dark:bg-[#1B2623]/40 text-sage px-2 py-1 rounded border border-slate-100 dark:border-slate-800/40 flex-shrink-0 cursor-pointer active:scale-95 transition-all"
+              >
+                + Rs. 500
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddNotebookTag('Rs. 1,000')}
+                className="bg-slate-50 dark:bg-[#1B2623]/40 text-sage px-2 py-1 rounded border border-slate-100 dark:border-slate-800/40 flex-shrink-0 cursor-pointer active:scale-95 transition-all"
+              >
+                + Rs. 1k
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddNotebookTag('Rs. 5,000')}
+                className="bg-slate-50 dark:bg-[#1B2623]/40 text-sage px-2 py-1 rounded border border-slate-100 dark:border-slate-800/40 flex-shrink-0 cursor-pointer active:scale-95 transition-all"
+              >
+                + Rs. 5k
+              </button>
+            </div>
+
+            {/* Ruled Notebook Paper Sheet */}
+            <div className="relative rounded-xl overflow-hidden border border-slate-200/60 dark:border-slate-800/80 shadow-inner">
+              {/* Paper bookmark sticker */}
+              <div className="absolute top-0 right-4 w-6 h-4 bg-amber-500/80 dark:bg-amber-600/80 rounded-b-md shadow-sm z-20 flex items-center justify-center">
+                <div className="w-1 h-1 rounded-full bg-white/60" />
+              </div>
+              
+              <textarea
+                id="vault-notebook-textarea"
+                value={notebookText}
+                onChange={(e) => setNotebookText(e.target.value)}
+                placeholder="Draft trust settlements, pending bills, or reminders here. Auto-saves as you type..."
+                className="w-full min-h-[160px] max-h-[300px] text-xs font-mono font-medium p-4 pt-5 pl-8 focus:outline-none resize-y transition-all text-charcoal dark:text-slate-100 bg-[#FCF9F2] dark:bg-[#181F1D]"
+                style={{
+                  lineHeight: '24px',
+                  backgroundImage: theme === 'light' 
+                    ? 'linear-gradient(to bottom, transparent 23px, #e9e5d9 23px)' 
+                    : 'linear-gradient(to bottom, transparent 23px, #2A3633 23px)',
+                  backgroundSize: '100% 24px',
+                  borderLeft: theme === 'light' ? '2px solid #fda4af' : '2px solid #881337',
+                }}
+              />
+            </div>
+
+            {/* Notebook Footer Toolbar */}
+            <div className="flex justify-between items-center text-[10px] text-slate-muted">
+              <span>{notebookText.length} characters | {notebookText.split('\n').filter(Boolean).length} lines</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleClearNotebook}
+                  className="px-2.5 py-1 text-rose-500 dark:text-rose-400 font-semibold hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyNotebook}
+                  className={`px-3 py-1 font-semibold rounded transition-all active:scale-95 flex items-center gap-1 cursor-pointer ${
+                    copiedNotebook 
+                      ? 'bg-emerald text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-[#1C2623] text-charcoal dark:text-white border border-slate-200/50 dark:border-slate-700/50'
+                  }`}
+                >
+                  {copiedNotebook ? (
+                    <>
+                      <Check className="h-3 w-3" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-3 w-3" />
+                      Copy All
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
