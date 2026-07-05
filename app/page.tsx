@@ -444,7 +444,7 @@ export default function Dashboard() {
 
   const calculateDailyTotal = (transList: Transaction[]) => {
     return transList
-      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep')
+      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   };
 
@@ -1420,11 +1420,11 @@ export default function Dashboard() {
         const printTransactions = transactions.filter(t => t.date && t.date.startsWith(printPrefix));
         
         const printIncome = printTransactions
-          .filter(t => t.type === 'income')
+          .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
           .reduce((sum, t) => sum + t.amount, 0);
 
         const printExpenses = printTransactions
-          .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep')
+          .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
         const printSweeps = printTransactions
@@ -1497,34 +1497,55 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="border border-black p-4 space-y-2">
-              <h2 className="text-sm font-bold uppercase border-b border-black pb-1">Transactions Record</h2>
-              <table className="w-full text-xs font-mono">
-                <thead>
-                  <tr className="border-b border-black text-left">
-                    <th className="pb-1">Date</th>
-                    <th className="pb-1">Category</th>
-                    <th className="pb-1">Description</th>
-                    <th className="pb-1 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {printTransactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-4 text-center italic text-gray-500">No transactions recorded for this period.</td>
-                    </tr>
-                  ) : (
-                    printTransactions.map(t => (
-                      <tr key={t.id} className="border-b border-gray-200">
-                        <td className="py-1">{t.date}</td>
-                        <td className="py-1">{t.category}</td>
-                        <td className="py-1">{t.description}</td>
-                        <td className="py-1 text-right">{t.amount > 0 ? '+' : '-'}Rs. {Math.abs(t.amount).toLocaleString()}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="border border-black p-4 space-y-4">
+              <h2 className="text-sm font-bold uppercase border-b border-black pb-1">Detailed Transaction Log</h2>
+              {printTransactions.length === 0 ? (
+                <p className="text-xs italic text-gray-500 text-center py-4">No transactions recorded for this period.</p>
+              ) : (() => {
+                // Group printTransactions by category
+                const grouped: { [category: string]: Transaction[] } = {};
+                printTransactions.forEach(t => {
+                  const cat = t.category || 'General';
+                  if (!grouped[cat]) {
+                    grouped[cat] = [];
+                  }
+                  grouped[cat].push(t);
+                });
+
+                // Get categories present
+                const categories = Object.keys(grouped).sort();
+
+                return (
+                  <div className="space-y-6">
+                    {categories.map((cat, idx) => {
+                      const catTransactions = grouped[cat];
+                      return (
+                        <div key={cat} className={`space-y-2 pb-4 ${idx < categories.length - 1 ? 'border-b border-gray-200' : ''}`}>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-black">[{cat.toUpperCase()}]</h3>
+                          <table className="w-full text-xs font-mono">
+                            <thead>
+                              <tr className="border-b border-black text-left">
+                                <th className="pb-1 w-1/4">Date</th>
+                                <th className="pb-1 w-1/2">Description</th>
+                                <th className="pb-1 text-right w-1/4">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {catTransactions.map((t, rowIdx) => (
+                                <tr key={t.id} className={rowIdx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                                  <td className="py-1">{t.date}</td>
+                                  <td className="py-1">{t.description}</td>
+                                  <td className="py-1 text-right">{t.amount > 0 ? '+' : '-'}Rs. {Math.abs(t.amount).toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="pt-12 border-t border-black flex justify-between text-[11px] font-mono text-gray-500">
@@ -1941,7 +1962,7 @@ export default function Dashboard() {
 
     const calculateDailySpent = (items: Transaction[]) => {
       return items
-        .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep')
+        .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
     };
 
@@ -2388,7 +2409,7 @@ export default function Dashboard() {
                     const dateKey = `${monthName}-${dateStr}`;
                     const isDateExpanded = !!expandedMonthlyDates[dateKey];
                     const daySpent = dayItems
-                      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep')
+                      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
                       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
                     
                     const dateParts = dateStr.split('-');
