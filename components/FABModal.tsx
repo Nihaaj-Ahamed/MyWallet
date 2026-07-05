@@ -42,11 +42,8 @@ export default function FABModal() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentSource, setPaymentSource] = useState<'hand' | 'bank'>('hand');
 
-  // Income Cycle states
-  const [cycleStartDate, setCycleStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [cycleEndDate, setCycleEndDate] = useState(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  // Income destination state
   const [incomeDestination, setIncomeDestination] = useState<'hand' | 'bank' | 'option'>('bank');
-  const [setCycleChecked, setSetCycleChecked] = useState(false);
 
   // Debt states
   const [personName, setPersonName] = useState('');
@@ -63,10 +60,7 @@ export default function FABModal() {
     setCategory('Food');
     setDate(new Date().toISOString().split('T')[0]);
     setPaymentSource('hand');
-    setCycleStartDate(new Date().toISOString().split('T')[0]);
-    setCycleEndDate(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     setIncomeDestination('bank');
-    setSetCycleChecked(false);
     setPersonName('');
     setDebtType('lent');
     setActualBalance('');
@@ -96,11 +90,11 @@ export default function FABModal() {
         if (isNaN(numAmount) || numAmount <= 0) return;
         await addIncome(
           numAmount,
-          description || (setCycleChecked ? 'Cycle Funding' : 'Additional Income'),
+          description || 'Additional Income',
           incomeDestination,
-          setCycleChecked,
-          setCycleChecked ? cycleStartDate : date,
-          setCycleChecked ? cycleEndDate : undefined
+          false,
+          date,
+          undefined
         );
       } else if (activeTab === 'withdrawal') {
         const numAmount = parseFloat(amount);
@@ -353,64 +347,22 @@ export default function FABModal() {
                       />
                     </div>
 
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#22302C] border border-slate-100 dark:border-slate-700/50">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs font-bold text-charcoal dark:text-[#E0E0E0]">Set Cycle / Start Sprint</span>
-                        <span className="text-[9px] text-sage">Initialize a new 10-day cycle budget and reset Hand Money</span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={setCycleChecked}
-                          onChange={(e) => setSetCycleChecked(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-black dark:peer-checked:bg-[#4DB6AC]"></div>
-                      </label>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Transaction Date</label>
+                      <input
+                        type="date"
+                        required
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="glass-input w-full rounded-xl px-4 py-3 text-sm"
+                      />
                     </div>
-
-                    {setCycleChecked ? (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Start Date</label>
-                          <input
-                            type="date"
-                            required
-                            value={cycleStartDate}
-                            onChange={(e) => setCycleStartDate(e.target.value)}
-                            className="glass-input w-full rounded-xl px-4 py-3 text-sm"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">End Date (10 days)</label>
-                          <input
-                            type="date"
-                            required
-                            value={cycleEndDate}
-                            onChange={(e) => setCycleEndDate(e.target.value)}
-                            className="glass-input w-full rounded-xl px-4 py-3 text-sm"
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Transaction Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={date}
-                          onChange={(e) => setDate(e.target.value)}
-                          className="glass-input w-full rounded-xl px-4 py-3 text-sm"
-                        />
-                      </div>
-                    )}
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Description</label>
                       <input
                         type="text"
-                        placeholder={setCycleChecked ? "e.g. Mid-Month Funding Cycle" : "e.g. Freelance project, Gift"}
+                        placeholder="e.g. Freelance project, Gift"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         className="glass-input w-full rounded-xl px-4 py-3 text-sm placeholder:text-slate-400/60"

@@ -92,11 +92,12 @@ export default function Dashboard() {
   const [nextCycleIncomeInput, setNextCycleIncomeInput] = useState('10000');
 
   // Expanded monthly accordion states (stores expanded status per monthYear string)
-  const [expandedMonths, setExpandedMonths] = useState<{ [key: string]: boolean }>({
-    'June 2026': true,
-    'May 2026': false,
-    'April 2026': false
-  });
+  const [expandedMonths, setExpandedMonths] = useState<{ [key: string]: boolean }>({});
+
+  useEffect(() => {
+    const todayLabel = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    setExpandedMonths({ [todayLabel]: true });
+  }, []);
 
   // Statement PDF printing state
   const [printStatementMonth, setPrintStatementMonth] = useState<string | null>(null);
@@ -533,6 +534,58 @@ export default function Dashboard() {
     if (isRightSwipe && activeMobileTab > 0) {
       setActiveMobileTab(prev => prev - 1);
     }
+  };
+
+  // Swiped transaction state in Monthly History
+  const [swipedTransactionId, setSwipedTransactionId] = useState<string | null>(null);
+  const [itemTouchStart, setItemTouchStart] = useState<number | null>(null);
+
+  const handleItemTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    setItemTouchStart(e.touches[0].clientX);
+  };
+
+  const handleItemTouchMove = (e: React.TouchEvent, id: string) => {
+    e.stopPropagation();
+    if (itemTouchStart === null) return;
+    const currentX = e.touches[0].clientX;
+    const diffX = itemTouchStart - currentX;
+    
+    // Swipe left to open edit options
+    if (diffX > 45) {
+      setSwipedTransactionId(id);
+    }
+    // Swipe right to close/hide edit options
+    if (diffX < -45) {
+      if (swipedTransactionId === id) {
+        setSwipedTransactionId(null);
+      }
+    }
+  };
+
+  const handleItemTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    setItemTouchStart(null);
+  };
+
+  const handleItemMouseDown = (e: React.MouseEvent) => {
+    setItemTouchStart(e.clientX);
+  };
+
+  const handleItemMouseMove = (e: React.MouseEvent, id: string) => {
+    if (itemTouchStart === null) return;
+    const diffX = itemTouchStart - e.clientX;
+    if (diffX > 45) {
+      setSwipedTransactionId(id);
+    } else if (diffX < -45) {
+      if (swipedTransactionId === id) {
+        setSwipedTransactionId(null);
+      }
+    }
+  };
+
+  const handleItemMouseUp = () => {
+    setItemTouchStart(null);
   };
 
   if (loading) {
@@ -2094,33 +2147,85 @@ export default function Dashboard() {
                               if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
                               if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
 
+                              const isSwiped = swipedTransactionId === t.id;
+
                               return (
                                 <div 
                                   key={t.id} 
-                                  className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-100 transition-all duration-200 group/item text-left text-[10px]"
+                                  onTouchStart={handleItemTouchStart}
+                                  onTouchMove={(e) => handleItemTouchMove(e, t.id)}
+                                  onTouchEnd={handleItemTouchEnd}
+                                  onMouseDown={handleItemMouseDown}
+                                  onMouseMove={(e) => handleItemMouseMove(e, t.id)}
+                                  onMouseUp={handleItemMouseUp}
+                                  onMouseLeave={handleItemMouseUp}
+                                  className="relative overflow-hidden rounded-xl border border-slate-100 bg-white select-none"
                                 >
-                                  {/* Avatar */}
-                                  {getTransactionAvatar(t.category, t.description, t.type)}
-
-                                  {/* Details */}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className={`text-[7px] uppercase px-1 py-0.2 rounded font-bold ${
-                                        isBank 
-                                          ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
-                                          : isOption
-                                            ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
-                                            : 'bg-amber-50 text-amber-600 border border-amber-100/50'
-                                      }`}>
-                                        {sourceLabel}
-                                      </span>
-                                      <span className="text-[8px] text-sage font-semibold">{t.category}</span>
+                                  {/* Action Buttons underneath */}
+                                  <div 
+                                    className="absolute right-0 top-0 bottom-0 flex items-center bg-slate-50 dark:bg-slate-800 transition-all duration-305 z-10"
+                                    style={{
+                                      width: isSwiped ? '80px' : '0px',
+                                      opacity: isSwiped ? 1 : 0,
+                                      overflow: 'hidden'
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-center w-full h-full gap-2 px-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleStartEditTransaction(t);
+                                          setSwipedTransactionId(null);
+                                        }}
+                                        className="p-1.5 text-sage hover:text-charcoal dark:hover:text-white rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-slate-700 shadow-sm border border-slate-100"
+                                        title="Edit transaction"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleDeleteTransaction(t.id);
+                                          setSwipedTransactionId(null);
+                                        }}
+                                        className="p-1.5 text-rose-500 hover:text-rose-700 rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-slate-700 shadow-sm border border-slate-100"
+                                        title="Delete transaction"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+                                      </button>
                                     </div>
-                                    <p className="text-[11px] font-semibold text-charcoal mt-0.5 leading-tight">{descClean}</p>
                                   </div>
-                                  <span className={`font-sans text-[11px] font-black flex-shrink-0 ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>
-                                    {isExpense ? '-' : '+'}{formatCurrency(Math.abs(t.amount))}
-                                  </span>
+
+                                  {/* Main Content Row */}
+                                  <div 
+                                    className="flex items-center gap-3 p-2.5 transition-transform duration-305 text-left text-[10px]"
+                                    style={{
+                                      transform: isSwiped ? 'translateX(-80px)' : 'translateX(0px)'
+                                    }}
+                                  >
+                                    {/* Avatar */}
+                                    {getTransactionAvatar(t.category, t.description, t.type)}
+
+                                    {/* Details */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`text-[7px] uppercase px-1 py-0.2 rounded font-bold ${
+                                          isBank 
+                                            ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
+                                            : isOption
+                                              ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
+                                              : 'bg-amber-50 text-amber-600 border border-amber-100/50'
+                                        }`}>
+                                          {sourceLabel}
+                                        </span>
+                                        <span className="text-[8px] text-sage font-semibold">{t.category}</span>
+                                      </div>
+                                      <p className="text-[11px] font-semibold text-charcoal mt-0.5 leading-tight">{descClean}</p>
+                                    </div>
+                                    <span className={`font-sans text-[11px] font-black flex-shrink-0 ${isExpense ? 'text-rose-500' : 'text-emerald-600'} mr-1`}>
+                                      {isExpense ? '-' : '+'}{formatCurrency(Math.abs(t.amount))}
+                                    </span>
+                                  </div>
                                 </div>
                               );
                             })}
