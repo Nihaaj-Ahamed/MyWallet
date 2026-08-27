@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWallet } from '../context/WalletContext';
 import FABModal from '../components/FABModal';
+import Header from '../components/Header';
+import { supabase } from '../lib/supabase';
 import { Transaction, Debt } from '../supabase-types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
@@ -40,9 +43,7 @@ import {
   Zap,
   ShoppingBag,
   CreditCard,
-  Building2,
-  Sun,
-  Moon
+  Building2
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -73,6 +74,22 @@ export default function Dashboard() {
     editDebt,
     deleteDebt
   } = useWallet();
+
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) router.replace('/sign-in');
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.replace('/sign-in');
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   // Calculate total outstanding debts for Bank and Hand Money
   // Lent = positive, Borrowed = negative
@@ -813,38 +830,7 @@ export default function Dashboard() {
   return (
     <main className={`min-h-screen bg-transparent pb-32 print:pb-0 theme-${theme}`}>
       
-      {/* HEADER NAVIGATION */}
-      <header className="no-print sticky top-0 z-35 top-bar-container">
-        <div className="max-w-7xl mx-auto px-4 py-6 md:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-[#1B2623] border border-slate-200/50 dark:border-slate-700/50 shadow-sm overflow-hidden">
-              <img src="/logo.png" alt="MyWallet Logo" className="h-6 w-6 object-contain" />
-            </div>
-            <div>
-              <h1 className="text-base font-extrabold tracking-tight text-charcoal dark:text-[#E0E0E0] uppercase flex items-center gap-1.5">
-                MyWallet<span className="text-[9px] bg-charcoal/10 dark:bg-[#E0E0E0]/10 text-charcoal dark:text-[#E0E0E0] border border-charcoal/20 dark:border-[#E0E0E0]/20 px-2 py-0.5 rounded font-mono font-bold">NIHAAJ_AHAMED MS</span>
-              </h1>
-              <p className="text-[10px] text-sage font-medium">High-End Liquid Wealth & Commute Tracker</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            {/* Binary Theme Switcher (Sun/Moon Toggle) */}
-            <button
-              type="button"
-              onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
-              className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-white dark:bg-[#1B2623] border border-slate-200/50 dark:border-slate-700/50 shadow-sm transition-all active:scale-95 cursor-pointer text-charcoal dark:text-[#E0E0E0]"
-              title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
-            >
-              {theme === 'light' ? (
-                <Moon className="h-5 w-5" strokeWidth={1.75} />
-              ) : (
-                <Sun className="h-5 w-5 text-amber-400" strokeWidth={1.75} />
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header theme={theme} setTheme={setTheme} />
 
       {/* COMBINATION NET WORTH PANEL (HERO CARD) */}
       <div className="no-print max-w-7xl mx-auto px-4 md:px-8 mt-4">

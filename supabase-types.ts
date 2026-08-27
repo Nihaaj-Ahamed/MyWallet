@@ -4,6 +4,7 @@ export interface Database {
       cycles: {
         Row: {
           id: string;
+          user_id: string | null;
           start_date: string; // ISO Date String YYYY-MM-DD
           end_date: string;   // ISO Date String YYYY-MM-DD
           income: number;     // Active cycle starting budget/income
@@ -12,6 +13,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          user_id?: string | null;
           start_date: string;
           end_date: string;
           income: number;
@@ -20,6 +22,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          user_id?: string | null;
           start_date?: string;
           end_date?: string;
           income?: number;
@@ -30,6 +33,7 @@ export interface Database {
       transactions: {
         Row: {
           id: string;
+          user_id: string | null;
           cycle_id: string;
           amount: number;      // Negative for expenses, positive for income
           type: 'expense' | 'income' | 'adjustment';
@@ -40,6 +44,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          user_id?: string | null;
           cycle_id: string;
           amount: number;
           type: 'expense' | 'income' | 'adjustment';
@@ -50,6 +55,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          user_id?: string | null;
           cycle_id?: string;
           amount?: number;
           type?: 'expense' | 'income' | 'adjustment';
@@ -62,6 +68,7 @@ export interface Database {
       debts: {
         Row: {
           id: string;
+          user_id: string | null;
           person_name: string;
           amount: number;      // Positive: they owe me (lent), Negative: I owe them (borrowed)
           type: 'lent' | 'borrowed';
@@ -70,6 +77,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          user_id?: string | null;
           person_name: string;
           amount: number;
           type: 'lent' | 'borrowed';
@@ -78,6 +86,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          user_id?: string | null;
           person_name?: string;
           amount?: number;
           type?: 'lent' | 'borrowed';
@@ -88,6 +97,7 @@ export interface Database {
       savings_vault: {
         Row: {
           id: string;
+          user_id: string | null;
           name: string;
           current_balance: number;
           target_goal: number;
@@ -95,6 +105,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          user_id?: string | null;
           name: string;
           current_balance: number;
           target_goal: number;
@@ -102,6 +113,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          user_id?: string | null;
           name?: string;
           current_balance?: number;
           target_goal?: number;

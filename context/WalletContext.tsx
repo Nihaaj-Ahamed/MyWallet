@@ -6,6 +6,10 @@ import { Cycle, Transaction, Debt, SavingsBank } from '../supabase-types';
 
 const client = supabase as any;
 
+const logDbError = (label: string, error: { message?: string } | null | undefined) => {
+  if (error) console.error(`[MyWallet DB] ${label}:`, error.message || error);
+};
+
 export interface MonthlyHistory {
   monthYear: string;
   income: number;
@@ -63,6 +67,7 @@ const MOCK_DEBTS: Debt[] = [];
 const MOCK_SAVINGS: SavingsBank[] = [
   {
     id: 'wallet-bank',
+    user_id: null,
     name: 'Bank Money',
     current_balance: 0,
     target_goal: 0,
@@ -70,6 +75,7 @@ const MOCK_SAVINGS: SavingsBank[] = [
   },
   {
     id: 'wallet-hand',
+    user_id: null,
     name: 'Hand Money',
     current_balance: 0,
     target_goal: 0,
@@ -77,6 +83,7 @@ const MOCK_SAVINGS: SavingsBank[] = [
   },
   {
     id: 'wallet-option',
+    user_id: null,
     name: 'Option Money',
     current_balance: 0,
     target_goal: 0,
@@ -93,9 +100,38 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [savings, setSavings] = useState<SavingsBank[]>([]);
   const [historicalMonths, setHistoricalMonths] = useState<MonthlyHistory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState<boolean>(!supabase);
 
-  // Load Initial Data
+  // Resolve the active Supabase session BEFORE any data is touched.
+  // All queries are strictly scoped to this user id.
   useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      setUserId(data.session?.user?.id ?? null);
+      setAuthReady(true);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load Initial Data — only after the authenticated user is known.
+  useEffect(() => {
+    if (!authReady) return;
+
+    const clearData = () => {
+      setCycles([]);
+      setTransactions([]);
+      setDebts([]);
+      setSavings([]);
+      setHistoricalMonths([]);
+    };
+
     const initData = async () => {
       setLoading(true);
       
@@ -103,32 +139,46 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setHistoricalMonths(localHistory ? JSON.parse(localHistory) : []);
 
       if (isSupabaseConfigured() && supabase) {
-        try {
-          const { data: cyclesData } = await client.from('cycles').select('*').order('created_at', { ascending: false });
-          const { data: transData } = await client.from('transactions').select('*').order('created_at', { ascending: false });
-          const { data: debtsData } = await client.from('debts').select('*').order('created_at', { ascending: false });
-          const { data: savingsData } = await client.from('savings_vault').select('*').order('created_at', { ascending: true });
+        // Supabase mode: no session yet -> keep the data surface empty.
+        // The dashboard redirects unauthenticated visitors to /sign-in.
+        if (!userId) {
+          clearData();
+          setLoading(false);
+          return;
+        }
 
-          let fetchedCycles = cyclesData || [];
-          let fetchedTrans = transData || [];
-          let fetchedDebts = debtsData || [];
+        try {
+          const { data: cyclesData, error: cyclesErr } = await client.from('cycles').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          const { data: transData, error: transErr } = await client.from('transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          const { data: debtsData, error: debtsErr } = await client.from('debts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          const { data: savingsData, error: savingsErr } = await client.from('savings_vault').select('*').eq('user_id', userId).order('created_at', { ascending: true });
+          logDbError('load cycles', cyclesErr);
+          logDbError('load transactions', transErr);
+          logDbError('load debts', debtsErr);
+          logDbError('load savings_vault', savingsErr);
+
+          const fetchedCycles = cyclesData || [];
+          const fetchedTrans = transData || [];
+          const fetchedDebts = debtsData || [];
           let fetchedSavings = savingsData || [];
 
-          // Ensure the 3 core wallets exist in the database (since they are required for transaction offsets)
+          // Ensure the 3 core wallets exist for THIS user (since they are required for transaction offsets)
           const hasBank = fetchedSavings.some((s: any) => s.id === 'wallet-bank');
           const hasHand = fetchedSavings.some((s: any) => s.id === 'wallet-hand');
           const hasOption = fetchedSavings.some((s: any) => s.id === 'wallet-option');
           
           if (!hasBank || !hasHand || !hasOption) {
             const missingWallets = [];
-            if (!hasBank) missingWallets.push({ id: 'wallet-bank', name: 'Bank Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() });
-            if (!hasHand) missingWallets.push({ id: 'wallet-hand', name: 'Hand Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() });
-            if (!hasOption) missingWallets.push({ id: 'wallet-option', name: 'Option Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() });
+            if (!hasBank) missingWallets.push({ id: 'wallet-bank', user_id: userId, name: 'Bank Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() });
+            if (!hasHand) missingWallets.push({ id: 'wallet-hand', user_id: userId, name: 'Hand Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() });
+            if (!hasOption) missingWallets.push({ id: 'wallet-option', user_id: userId, name: 'Option Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() });
             
-            await client.from('savings_vault').insert(missingWallets);
+            const { error: seedErr } = await client.from('savings_vault').insert(missingWallets);
+            logDbError('seed core wallets', seedErr);
             
             // Re-fetch
-            const { data: sData } = await client.from('savings_vault').select('*').order('created_at', { ascending: true });
+            const { data: sData, error: sErr } = await client.from('savings_vault').select('*').eq('user_id', userId).order('created_at', { ascending: true });
+            logDbError('load savings_vault (re-seed)', sErr);
             fetchedSavings = sData || [];
           }
 
@@ -147,9 +197,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     initData();
-  }, []);
+  }, [authReady, userId]);
 
-  const loadFromLocalStorage = () => {
+  function loadFromLocalStorage() {
     if (typeof window === 'undefined') return;
 
     const localCycles = localStorage.getItem('vault_cycles');
@@ -165,9 +215,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSavings(JSON.parse(localSavings));
     } else {
       const defaultSavings = [
-        { id: 'wallet-bank', name: 'Bank Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() },
-        { id: 'wallet-hand', name: 'Hand Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() },
-        { id: 'wallet-option', name: 'Option Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() }
+        { id: 'wallet-bank', user_id: null as string | null, name: 'Bank Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() },
+        { id: 'wallet-hand', user_id: null as string | null, name: 'Hand Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() },
+        { id: 'wallet-option', user_id: null as string | null, name: 'Option Money', current_balance: 0, target_goal: 0, created_at: new Date().toISOString() }
       ];
       localStorage.setItem('vault_cycles', JSON.stringify([]));
       localStorage.setItem('vault_transactions', JSON.stringify([]));
@@ -181,7 +231,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSavings(defaultSavings);
     }
     setHistoricalMonths(localHistory ? JSON.parse(localHistory) : []);
-  };
+  }
 
   const saveStateToLocal = (
     newCycles: Cycle[],
@@ -219,8 +269,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     .filter(s => s.id !== 'wallet-bank' && s.id !== 'wallet-hand' && s.id !== 'wallet-option')
     .reduce((sum, s) => sum + s.current_balance, 0);
 
-  // Net Worth = Hand Money + Saving Money
-  const netWorth = handMoney + savingMoney;
+  // Net Worth = Hand Money + Bank Money
+  const netWorth = handMoney + bankMoney;
 
   // Expected Liquid Cash = handMoney
   const expectedLiquidBalance = handMoney;
@@ -230,9 +280,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedSavings = savings.map(s => s.id === id ? { ...s, current_balance: amount } : s);
     setSavings(updatedSavings);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', id);
+        await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', id).eq('user_id', userId);
       } catch (err) {
         console.error("Failed to update wallet in Supabase:", err);
       }
@@ -242,8 +292,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Log expense (deducts from Hand Money by default, or Bank Money if specified)
   const addExpense = async (amount: number, description: string, category: string, date: string, source: 'hand' | 'bank' = 'hand') => {
-    if (!activeCycle) return;
-
     const isBank = source === 'bank';
     const walletId = isBank ? 'wallet-bank' : 'wallet-hand';
 
@@ -254,8 +302,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSavings(updatedSavings);
 
     const newTransaction: Transaction = {
-      id: Math.random().toString(36).substring(2, 9),
-      cycle_id: activeCycle.id,
+      id: crypto.randomUUID(), user_id: userId,
+      cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
       amount: -Math.abs(amount), // Negative for expense
       type: 'expense',
       category: category as any,
@@ -267,9 +315,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedTransactions = [newTransaction, ...transactions];
     setTransactions(updatedTransactions);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
         await client.from('transactions').insert(newTransaction as any);
       } catch (err) {
         console.error("Supabase insert expense error:", err);
@@ -306,7 +354,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const eDate = endDate || new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const newCycle: Cycle = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(), user_id: userId,
         start_date: sDate,
         end_date: eDate,
         income: amount,
@@ -329,7 +377,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       const incomeTrans: Transaction = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(), user_id: userId,
         cycle_id: newCycle.id,
         amount,
         type: 'income',
@@ -341,12 +389,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       updatedTransactions = [incomeTrans, ...transactions];
 
-      if (isSupabaseConfigured() && supabase) {
+      if (isSupabaseConfigured() && supabase && userId) {
         try {
           await client.from('cycles').insert(newCycle as any);
-          await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand');
+          await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand').eq('user_id', userId);
           if (walletId !== 'wallet-hand') {
-            await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+            await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
           }
           await client.from('transactions').insert(incomeTrans as any);
         } catch (err) {
@@ -365,7 +413,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Transaction is linked to the active cycle, if one exists
       const incomeTrans: Transaction = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(), user_id: userId,
         cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
         amount,
         type: 'income',
@@ -377,9 +425,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       updatedTransactions = [incomeTrans, ...transactions];
 
-      if (isSupabaseConfigured() && supabase) {
+      if (isSupabaseConfigured() && supabase && userId) {
         try {
-          await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+          await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
           await client.from('transactions').insert(incomeTrans as any);
         } catch (err) {
           console.error("Supabase addIncome error (no cycle):", err);
@@ -395,8 +443,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Dedicated Cash Withdrawal (Deducts Bank Money, Increases Hand Money)
   const addWithdrawal = async (amount: number, date: string) => {
-    if (!activeCycle) return;
-
     const currentBankObj = savings.find(s => s.id === 'wallet-bank');
     const currentHandObj = savings.find(s => s.id === 'wallet-hand');
 
@@ -411,8 +457,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSavings(updatedSavings);
 
     const withdrawalTrans: Transaction = {
-      id: Math.random().toString(36).substring(2, 9),
-      cycle_id: activeCycle.id,
+      id: crypto.randomUUID(), user_id: userId,
+      cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
       amount: -amount,
       type: 'expense',
       category: 'General',
@@ -424,10 +470,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedTransactions = [withdrawalTrans, ...transactions];
     setTransactions(updatedTransactions);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('savings_vault').update({ current_balance: newBankBalance } as any).eq('id', 'wallet-bank');
-        await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand');
+        await client.from('savings_vault').update({ current_balance: newBankBalance } as any).eq('id', 'wallet-bank').eq('user_id', userId);
+        await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand').eq('user_id', userId);
         await client.from('transactions').insert(withdrawalTrans as any);
       } catch (err) {
         console.error("Supabase withdrawal error:", err);
@@ -448,7 +494,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const finalAmount = type === 'lent' ? Math.abs(amount) : -Math.abs(amount);
     
     const newDebt: Debt = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(), user_id: userId,
       person_name: personName,
       amount: finalAmount,
       type,
@@ -470,7 +516,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Create a transaction record to log the debt creation event
     const newTransaction: Transaction = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(), user_id: userId,
       cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
       amount: balanceChange,
       type: type === 'lent' ? 'expense' : 'income',
@@ -483,10 +529,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedTransactions = [newTransaction, ...transactions];
     setTransactions(updatedTransactions);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
         await client.from('debts').insert(newDebt as any);
-        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
         await client.from('transactions').insert(newTransaction as any);
       } catch (err) {
         console.error("Supabase debt insert error:", err);
@@ -503,9 +549,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedDebts = debts.filter(d => d.id !== id);
     setDebts(updatedDebts);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('debts').delete().eq('id', id);
+        await client.from('debts').delete().eq('id', id).eq('user_id', userId);
       } catch (err) {
         console.error("Supabase delete debt error:", err);
       }
@@ -535,14 +581,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
     setDebts(updatedDebts);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
         await client.from('debts').update({
           amount: finalAmount,
           person_name: personName,
           type,
           description: finalDescription
-        } as any).eq('id', id);
+        } as any).eq('id', id).eq('user_id', userId);
       } catch (err) {
         console.error("Supabase edit debt error:", err);
       }
@@ -553,14 +599,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Settle Debt (increases chosen wallet if they pay us back; decreases chosen wallet if we pay them)
   const settleDebt = async (debtId: string, settleAmount: number, source: 'hand' | 'bank' = 'hand') => {
     const debt = debts.find(d => d.id === debtId);
-    if (!debt || !activeCycle) return;
+    if (!debt) return;
 
     const isLent = debt.amount > 0;
     const transAmount = isLent ? Math.abs(settleAmount) : -Math.abs(settleAmount);
     
     const settlementTransaction: Transaction = {
-      id: Math.random().toString(36).substring(2, 9),
-      cycle_id: activeCycle.id,
+      id: crypto.randomUUID(), user_id: userId,
+      cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
       amount: transAmount,
       type: isLent ? 'income' : 'expense',
       category: 'Debt Settlement',
@@ -590,14 +636,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setDebts(updatedDebts);
     setTransactions(updatedTrans);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
         if (Math.abs(newDebtAmount) < 1) {
-          await client.from('debts').delete().eq('id', debtId);
+          await client.from('debts').delete().eq('id', debtId).eq('user_id', userId);
         } else {
-          await client.from('debts').update({ amount: newDebtAmount } as any).eq('id', debtId);
+          await client.from('debts').update({ amount: newDebtAmount } as any).eq('id', debtId).eq('user_id', userId);
         }
-        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId);
+        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
         await client.from('transactions').insert(settlementTransaction as any);
       } catch (err) {
         console.error("Supabase debt settlement failed:", err);
@@ -609,14 +655,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Reconcile / Adjust cash in hand
   const reconcileCash = async (actualCash: number) => {
-    if (!activeCycle) return;
-    
     const discrepancy = actualCash - handMoney;
     if (Math.abs(discrepancy) < 0.01) return;
 
     const newTransaction: Transaction = {
-      id: Math.random().toString(36).substring(2, 9),
-      cycle_id: activeCycle.id,
+      id: crypto.randomUUID(), user_id: userId,
+      cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
       amount: discrepancy,
       type: discrepancy < 0 ? 'expense' : 'income',
       category: 'Adjustment',
@@ -631,9 +675,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedTrans = [newTransaction, ...transactions];
     setTransactions(updatedTrans);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('savings_vault').update({ current_balance: actualCash } as any).eq('id', 'wallet-hand');
+        await client.from('savings_vault').update({ current_balance: actualCash } as any).eq('id', 'wallet-hand').eq('user_id', userId);
         await client.from('transactions').insert(newTransaction as any);
       } catch (err) {
         console.error("Supabase adjustment error:", err);
@@ -645,13 +689,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Increment commuter transport logistics
   const incrementCommute = async (category: 'Travel (Colombo)' | 'Travel (Home)', cost: number) => {
-    if (!activeCycle) return;
     await addExpense(cost, `${category} ride`, category, new Date().toISOString().split('T')[0], 'hand');
   };
 
   // Decrement commuter logistics
   const decrementCommute = async (category: 'Travel (Colombo)' | 'Travel (Home)') => {
-    const commuteTrans = transactions.find(t => t.cycle_id === activeCycle?.id && t.category === category);
+    const targetCycleId = activeCycle ? activeCycle.id : 'no-active-cycle';
+    const commuteTrans = transactions.find(t => t.cycle_id === targetCycleId && t.category === category);
     if (commuteTrans) {
       const refundAmt = Math.abs(commuteTrans.amount);
       const currentHand = savings.find(s => s.id === 'wallet-hand');
@@ -662,10 +706,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const updated = transactions.filter(t => t.id !== commuteTrans.id);
       setTransactions(updated);
 
-      if (isSupabaseConfigured() && supabase) {
+      if (isSupabaseConfigured() && supabase && userId) {
         try {
-          await client.from('transactions').delete().eq('id', commuteTrans.id);
-          await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand');
+          await client.from('transactions').delete().eq('id', commuteTrans.id).eq('user_id', userId);
+          await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand').eq('user_id', userId);
         } catch (err) {
           console.error("Supabase decrement commute failed:", err);
         }
@@ -678,7 +722,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Deposit from Hand Money to a specific Saving bank goal
   const depositToSavings = async (bankId: string, amount: number) => {
     const bank = savings.find(s => s.id === bankId);
-    if (!bank || !activeCycle) return;
+    if (!bank) return;
 
     const newBalance = bank.current_balance + amount;
     const newHandBalance = handMoney - amount;
@@ -691,8 +735,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSavings(updatedSavings);
 
     const sweepTransaction: Transaction = {
-      id: Math.random().toString(36).substring(2, 9),
-      cycle_id: activeCycle.id,
+      id: crypto.randomUUID(), user_id: userId,
+      cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
       amount: -Math.abs(amount),
       type: 'expense',
       category: 'Savings Sweep',
@@ -704,10 +748,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedTrans = [sweepTransaction, ...transactions];
     setTransactions(updatedTrans);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', bankId);
-        await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand');
+        await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', bankId).eq('user_id', userId);
+        await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand').eq('user_id', userId);
         await client.from('transactions').insert(sweepTransaction as any);
       } catch (err) {
         console.error("Supabase savings sweep failed:", err);
@@ -725,8 +769,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     nextCycleStart: string,
     nextCycleEnd: string
   ) => {
-    if (!activeCycle) return;
-
     let updatedSavings = [...savings];
     let updatedTransactions = [...transactions];
 
@@ -743,8 +785,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         const sweepTransaction: Transaction = {
-          id: Math.random().toString(36).substring(2, 9),
-          cycle_id: activeCycle.id,
+          id: crypto.randomUUID(), user_id: userId,
+          cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
           amount: -Math.abs(sweepAmount),
           type: 'expense',
           category: 'Savings Sweep',
@@ -755,9 +797,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         updatedTransactions = [sweepTransaction, ...transactions];
 
-        if (isSupabaseConfigured() && supabase) {
+        if (isSupabaseConfigured() && supabase && userId) {
           try {
-            await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', bankId);
+            await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', bankId).eq('user_id', userId);
             await client.from('transactions').insert(sweepTransaction as any);
           } catch (e) {
             console.error("Supabase closeActiveCycleAndSweep error:", e);
@@ -767,7 +809,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     const newCycle: Cycle = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(), user_id: userId,
       start_date: nextCycleStart,
       end_date: nextCycleEnd,
       income: nextCycleIncome,
@@ -779,9 +821,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const updatedCycles = [newCycle, ...cycles];
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('savings_vault').update({ current_balance: finalHandBalance } as any).eq('id', 'wallet-hand');
+        await client.from('savings_vault').update({ current_balance: finalHandBalance } as any).eq('id', 'wallet-hand').eq('user_id', userId);
         await client.from('cycles').insert(newCycle as any);
       } catch (e) {
         console.error("Supabase cycle rollover savings_vault/cycle update error:", e);
@@ -804,10 +846,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updatedSavings = savings.map(s => s.id === 'wallet-hand' ? { ...s, current_balance: amount } : s);
     setSavings(updatedSavings);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('cycles').update({ income: amount } as any).eq('id', activeCycle.id);
-        await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand');
+        await client.from('cycles').update({ income: amount } as any).eq('id', activeCycle.id).eq('user_id', userId);
+        await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand').eq('user_id', userId);
       } catch (err) {
         console.error("Failed to update active cycle income in Supabase:", err);
       }
@@ -874,20 +916,20 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
     setTransactions(updatedTrans);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
         const origWalletVal = updatedSavings.find(s => s.id === origWalletId)?.current_balance || 0;
         const newWalletVal = updatedSavings.find(s => s.id === newWalletId)?.current_balance || 0;
 
-        await client.from('savings_vault').update({ current_balance: origWalletVal } as any).eq('id', origWalletId);
+        await client.from('savings_vault').update({ current_balance: origWalletVal } as any).eq('id', origWalletId).eq('user_id', userId);
         if (origWalletId !== newWalletId) {
-          await client.from('savings_vault').update({ current_balance: newWalletVal } as any).eq('id', newWalletId);
+          await client.from('savings_vault').update({ current_balance: newWalletVal } as any).eq('id', newWalletId).eq('user_id', userId);
         }
         await client.from('transactions').update({
           amount: origTrans.type === 'income' ? Math.abs(amount) : -Math.abs(amount),
           description: finalDescription,
           category: category as any
-        } as any).eq('id', id);
+        } as any).eq('id', id).eq('user_id', userId);
       } catch (err) {
         console.error("Supabase editTransaction error:", err);
       }
@@ -914,9 +956,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const newBalance = wallet.current_balance - amountAbs;
         updatedSavings = updatedSavings.map(s => s.id === walletId ? { ...s, current_balance: newBalance } : s);
         
-        if (isSupabaseConfigured() && supabase) {
+        if (isSupabaseConfigured() && supabase && userId) {
           try {
-            await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', walletId);
+            await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', walletId).eq('user_id', userId);
           } catch (err) {
             console.error(`Failed to update ${walletId} balance on income delete in Supabase:`, err);
           }
@@ -934,9 +976,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const newHandBalance = hand.current_balance + amountAbs;
           updatedSavings = updatedSavings.map(s => s.id === 'wallet-hand' ? { ...s, current_balance: newHandBalance } : s);
           
-          if (isSupabaseConfigured() && supabase) {
+          if (isSupabaseConfigured() && supabase && userId) {
             try {
-              await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand');
+              await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand').eq('user_id', userId);
             } catch (err) {
               console.error("Failed to update hand balance on sweep delete in Supabase:", err);
             }
@@ -947,9 +989,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const newTargetBalance = targetBank.current_balance - amountAbs;
           updatedSavings = updatedSavings.map(s => s.id === targetBank.id ? { ...s, current_balance: newTargetBalance } : s);
           
-          if (isSupabaseConfigured() && supabase) {
+          if (isSupabaseConfigured() && supabase && userId) {
             try {
-              await client.from('savings_vault').update({ current_balance: newTargetBalance } as any).eq('id', targetBank.id);
+              await client.from('savings_vault').update({ current_balance: newTargetBalance } as any).eq('id', targetBank.id).eq('user_id', userId);
             } catch (err) {
               console.error("Failed to update target bank balance on sweep delete in Supabase:", err);
             }
@@ -969,10 +1011,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return s;
         });
         
-        if (isSupabaseConfigured() && supabase) {
+        if (isSupabaseConfigured() && supabase && userId) {
           try {
-            await client.from('savings_vault').update({ current_balance: newBankBalance } as any).eq('id', 'wallet-bank');
-            await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand');
+            await client.from('savings_vault').update({ current_balance: newBankBalance } as any).eq('id', 'wallet-bank').eq('user_id', userId);
+            await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand').eq('user_id', userId);
           } catch (err) {
             console.error("Failed to update balances on withdrawal delete in Supabase:", err);
           }
@@ -987,9 +1029,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const newBalance = wallet.current_balance + amountAbs;
           updatedSavings = updatedSavings.map(s => s.id === walletId ? { ...s, current_balance: newBalance } : s);
           
-          if (isSupabaseConfigured() && supabase) {
+          if (isSupabaseConfigured() && supabase && userId) {
             try {
-              await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', walletId);
+              await client.from('savings_vault').update({ current_balance: newBalance } as any).eq('id', walletId).eq('user_id', userId);
             } catch (err) {
               console.error("Failed to update wallet balance on expense delete in Supabase:", err);
             }
@@ -1003,9 +1045,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSavings(updatedSavings);
     setTransactions(updatedTransactions);
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('transactions').delete().eq('id', id);
+        await client.from('transactions').delete().eq('id', id).eq('user_id', userId);
       } catch (err) {
         console.error("Failed to delete transaction from Supabase:", err);
       }
@@ -1024,18 +1066,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.removeItem('vault_savings');
     localStorage.removeItem('vault_historical_months');
 
-    if (isSupabaseConfigured() && supabase) {
+    if (isSupabaseConfigured() && supabase && userId) {
       try {
         setLoading(true);
-        await client.from('transactions').delete().neq('id', 'dummy-non-existent-id');
-        await client.from('cycles').delete().neq('id', 'dummy-non-existent-id');
-        await client.from('debts').delete().neq('id', 'dummy-non-existent-id');
-        await client.from('savings_vault').delete().neq('id', 'dummy-non-existent-id');
+        await client.from('transactions').delete().eq('user_id', userId);
+        await client.from('cycles').delete().eq('user_id', userId);
+        await client.from('debts').delete().eq('user_id', userId);
+        await client.from('savings_vault').delete().eq('user_id', userId);
 
         await client.from('cycles').insert(MOCK_CYCLES);
         await client.from('transactions').insert(MOCK_TRANSACTIONS);
         await client.from('debts').insert(MOCK_DEBTS);
-        await client.from('savings_vault').insert(MOCK_SAVINGS);
+        await client.from('savings_vault').insert(MOCK_SAVINGS.map(s => ({ ...s, user_id: userId })));
 
         setCycles(MOCK_CYCLES);
         setTransactions(MOCK_TRANSACTIONS);
