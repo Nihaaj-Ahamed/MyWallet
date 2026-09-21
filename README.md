@@ -2,7 +2,7 @@
 
 An ultra-premium, production-ready financial tracking web application featuring a mathematically perfect discrepancy reconciliation engine, dynamic mobile viewports, privacy sensitive masking, and premium theme accent selectors.
 
-Developed by **Nihaaj Ahamed MS** ([Nihaaj-Ahamed](https://github.com/Nihaaj-Ahamed)).
+Developed by **Nihaaj Ahamed MS** 
 
 ---
 
@@ -77,4 +77,4 @@ Developed by **Nihaaj Ahamed MS** ([Nihaaj-Ahamed](https://github.com/Nihaaj-Aha
 ## Author & Updates
 For more updates or inquiries, contact:
 - **Lead Developer:** Nihaaj Ahamed MS
-- **GitHub Repository:** [Nihaaj-Ahamed/MyWallet](https://github.com/Nihaaj-Ahamed/MyWallet)
+- **GitHub Repository:** [Nihaaj-Ahamed/changeX](https://github.com/Nihaaj-Ahamed/changeX)
