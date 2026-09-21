@@ -77,4 +77,4 @@ Developed by **Nihaaj Ahamed MS**
 ## Author & Updates
 For more updates or inquiries, contact:
 - **Lead Developer:** Nihaaj Ahamed MS
-- **GitHub Repository:** [Nihaaj-Ahamed/changeX](https://github.com/Nihaaj-Ahamed/MyWallet)
+- **GitHub Repository:** [Nihaaj-Ahamed/MyWallet](https://github.com/Nihaaj-Ahamed/MyWallet)
