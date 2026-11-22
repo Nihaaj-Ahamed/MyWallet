@@ -375,6 +375,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       endDateDefault.setDate(endDateDefault.getDate() + 9);
       const eDate = endDate || `${endDateDefault.getFullYear()}-${String(endDateDefault.getMonth() + 1).padStart(2, '0')}-${String(endDateDefault.getDate()).padStart(2, '0')}`;
 
+      const existingHandBalance = savings.find(s => s.id === 'wallet-hand')?.current_balance ?? 0;
+      const newHandBalance = destination === 'hand'
+        ? existingHandBalance + amount
+        : existingHandBalance;
+
       const newCycle: Cycle = {
         id: crypto.randomUUID(), user_id: userId,
         start_date: sDate,
@@ -386,11 +391,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       updatedCycles = [newCycle, ...cycles];
 
-      // Set Hand Money equal to the new cycle income amount
-      // and also apply the credit to the selected destination wallet
+      // A new cycle gets this amount as its base income.
+      // Wallet balances remain independent: income is added, never replaced.
       updatedSavings = savings.map(s => {
         if (s.id === 'wallet-hand') {
-          return { ...s, current_balance: amount };
+          return { ...s, current_balance: newHandBalance };
         }
         if (s.id === walletId && walletId !== 'wallet-hand') {
           return { ...s, current_balance: newWalletBalance };
@@ -414,7 +419,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (isSupabaseConfigured() && supabase && userId) {
         try {
           await client.from('cycles').insert(newCycle as any);
-          await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand').eq('user_id', userId);
+          await client.from('savings_vault').update({ current_balance: newHandBalance } as any).eq('id', 'wallet-hand').eq('user_id', userId);
           if (walletId !== 'wallet-hand') {
             await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
           }
