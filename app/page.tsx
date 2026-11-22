@@ -170,10 +170,17 @@ export default function Dashboard() {
     }
   };
 
-  // 10-Day Cycle closing simulation state
+  // Day Cycle closing simulation state
   const [closeoutSweepAmount, setCloseoutSweepAmount] = useState('');
   const [closeoutSweepBank, setCloseoutSweepBank] = useState('');
   const [nextCycleIncomeInput, setNextCycleIncomeInput] = useState('10000');
+  const [nextCycleStartInput, setNextCycleStartInput] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
 
   // Expanded monthly accordion states (stores expanded status per monthYear string)
   const [expandedMonths, setExpandedMonths] = useState<{ [key: string]: boolean }>({});
@@ -322,9 +329,13 @@ export default function Dashboard() {
   const colomboCommuteCount = activeTransactions.filter(t => t.category === 'Travel (Colombo)').length;
   const homeCommuteCount = activeTransactions.filter(t => t.category === 'Travel (Home)').length;
 
-  // Filter transactions for specific 10-day active cycle
+  // Filter transactions for the active Day Cycle date range
   const cycleTransactions = activeCycle 
-    ? transactions.filter(t => t.cycle_id === activeCycle.id)
+    ? transactions.filter(t =>
+        t.cycle_id === activeCycle.id &&
+        t.date >= activeCycle.start_date &&
+        t.date <= activeCycle.end_date
+      )
     : [];
   const cycleBaseIncome = activeCycle?.income || 0;
   const cycleExtraIncome = cycleTransactions
@@ -614,10 +625,25 @@ export default function Dashboard() {
       return;
     }
 
-    const nextStart = new Date();
-    const nextEnd = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
-    const nextStartStr = nextStart.toISOString().split('T')[0];
-    const nextEndStr = nextEnd.toISOString().split('T')[0];
+    const [startYear, startMonth, startDay] = nextCycleStartInput.split('-').map(Number);
+    if (!startYear || !startMonth || !startDay) {
+      alert("Please specify the base income date.");
+      return;
+    }
+
+    const nextStart = new Date(startYear, startMonth - 1, startDay);
+    if (
+      nextStart.getFullYear() !== startYear ||
+      nextStart.getMonth() !== startMonth - 1 ||
+      nextStart.getDate() !== startDay
+    ) {
+      alert("Please specify a valid base income date.");
+      return;
+    }
+
+    const nextEnd = new Date(startYear, startMonth - 1, startDay + 9);
+    const nextStartStr = getLocalDateString(nextStart);
+    const nextEndStr = getLocalDateString(nextEnd);
 
     await closeActiveCycleAndSweep(
       0, // sweepAmount = 0 (separate)
@@ -627,7 +653,7 @@ export default function Dashboard() {
       nextEndStr
     );
 
-    alert("Successfully started a new 10-day cycle! Remaining Hand Money balance has been preserved.");
+    alert("Successfully started a new Day Cycle! Remaining Hand Money balance has been preserved.");
   };
 
   // Printing triggers
@@ -1210,7 +1236,7 @@ export default function Dashboard() {
                 ? 'bg-black text-white scale-110 shadow-sm' 
                 : 'text-sage  '
             }`}
-            title="10-Day Cycles"
+            title="Day Cycles"
           >
             <Sparkles className="h-5 w-5" strokeWidth={activeMobileTab === 2 ? 2 : 1.75} />
           </button>
@@ -2141,7 +2167,7 @@ export default function Dashboard() {
     );
   }
 
-  // TAB 3 RENDER: 10-DAY CYCLES
+  // TAB 3 RENDER: DAY CYCLES
   function renderCycles() {
     const expensePercent = totalCycleIncome > 0 ? (cycleExpenses / totalCycleIncome) * 100 : 0;
 
@@ -2165,13 +2191,18 @@ export default function Dashboard() {
     return (
       <div className="glass-panel p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-xs font-bold tracking-wider uppercase text-charcoal">10-Day Cycles</h3>
+          <h3 className="text-xs font-bold tracking-wider uppercase text-charcoal">Day Cycle</h3>
           {activeCycle && (
             <span className="text-[9px] font-bold text-champagne bg-champagne/10 border border-champagne/20 px-2.5 py-1 rounded-full">
-              Active Sprint
+              Active Cycle
             </span>
           )}
         </div>
+        {activeCycle && (
+          <p className="text-[10px] font-bold text-sage">
+            Base income period: {activeCycle.start_date} to {activeCycle.end_date}
+          </p>
+        )}
 
         {/* Metrics Grid */}
         <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
@@ -2230,7 +2261,7 @@ export default function Dashboard() {
           {/* Progress bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-[9px] text-sage font-bold uppercase tracking-wider">
-              <span>Sprint Budget Exhaustion</span>
+              <span>Day Cycle Budget Used</span>
               <span>{expensePercent.toFixed(0)}%</span>
             </div>
             <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden">
@@ -2404,10 +2435,17 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Action 2: Start Next 10-Day Cycle */}
+          {/* Action 2: Start Next Day Cycle */}
           <div className="space-y-2 pt-3 border-t border-slate-200/50">
-            <span className="text-[10px] uppercase tracking-wider text-sage font-bold block">2. Start Next 10-Day Cycle</span>
-            <div className="flex gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-sage font-bold block">2. Start Next Day Cycle</span>
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                type="date"
+                value={nextCycleStartInput}
+                onChange={(e) => setNextCycleStartInput(e.target.value)}
+                className="w-full bg-white dark:bg-[#1B2623] border border-slate-205 dark:border-slate-750 rounded-xl px-3 py-2 text-xs font-sans text-charcoal dark:text-white focus:outline-none shadow-sm"
+                aria-label="Base income date"
+              />
               <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-sage font-bold">Rs.</span>
                 <input

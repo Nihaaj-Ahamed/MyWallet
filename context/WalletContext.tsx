@@ -371,7 +371,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (setCycle) {
       const sDate = startDate || new Date().toISOString().split('T')[0];
-      const eDate = endDate || new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const endDateDefault = new Date(`${sDate}T12:00:00`);
+      endDateDefault.setDate(endDateDefault.getDate() + 9);
+      const eDate = endDate || `${endDateDefault.getFullYear()}-${String(endDateDefault.getMonth() + 1).padStart(2, '0')}-${String(endDateDefault.getDate()).padStart(2, '0')}`;
 
       const newCycle: Cycle = {
         id: crypto.randomUUID(), user_id: userId,
