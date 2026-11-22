@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
-import { Moon, Sun, LogOut, LogIn } from 'lucide-react';
+import { Moon, Sun, LogIn, UserCircle } from 'lucide-react';
 
 interface HeaderProps {
   theme: 'light' | 'dark';
@@ -29,12 +29,6 @@ export default function Header({ theme, setTheme }: HeaderProps) {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const handleSignOut = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setUser(null);
-  };
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || '';
 
@@ -61,14 +55,13 @@ export default function Header({ theme, setTheme }: HeaderProps) {
                   <span className="text-xs font-bold text-charcoal dark:text-[#E0E0E0] max-w-[140px] truncate">{displayName}</span>
                   <span className="text-[10px] text-sage max-w-[140px] truncate">{user.email}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  title="Sign Out"
+                <Link
+                  href="/profile"
+                  title="Open Profile"
                   className="flex items-center justify-center w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-white dark:bg-[#1B2623] border border-slate-200/50 dark:border-slate-700/50 shadow-sm transition-all active:scale-95 cursor-pointer text-charcoal dark:text-[#E0E0E0] hover:text-rose-500 dark:hover:text-rose-400"
                 >
-                  <LogOut className="h-4.5 w-4.5" strokeWidth={1.75} />
-                </button>
+                  <UserCircle className="h-5 w-5" strokeWidth={1.75} />
+                </Link>
               </div>
             ) : (
               <>
