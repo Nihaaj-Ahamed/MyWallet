@@ -338,18 +338,13 @@ export default function Dashboard() {
       )
     : [];
   const cycleBaseIncome = activeCycle?.income || 0;
-  const cycleExtraIncome = cycleTransactions
-    .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalCycleIncome = cycleBaseIncome + cycleExtraIncome;
+  const totalCycleIncome = cycleBaseIncome;
 
   const cycleExpenses = cycleTransactions
     .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  // Remaining cycle budget is cycle income minus expenses.
-  // Hand Money remains a separate wallet balance.
-  const remainingCycleBalance = totalCycleIncome - cycleExpenses;
+  const remainingCycleBalance = Math.max(0, cycleBaseIncome - cycleExpenses);
 
   // Active month total income (base + extra incomes)
   const activeMonthIncome = activeTransactions

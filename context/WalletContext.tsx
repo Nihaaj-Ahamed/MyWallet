@@ -433,6 +433,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return s;
       });
 
+      // Normal income increases the active Day Cycle base income.
+      if (activeCycle) {
+        const updatedBaseIncome = activeCycle.income + amount;
+        updatedCycles = cycles.map(c =>
+          c.id === activeCycle.id ? { ...c, income: updatedBaseIncome } : c,
+        );
+      }
+
       // Transaction is linked to the active cycle, if one exists
       const incomeTrans: Transaction = {
         id: crypto.randomUUID(), user_id: userId,
@@ -450,6 +458,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (isSupabaseConfigured() && supabase && userId) {
         try {
           await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
+          if (activeCycle) {
+            await client.from('cycles').update({
+              income: activeCycle.income + amount,
+            } as any).eq('id', activeCycle.id).eq('user_id', userId);
+          }
           await client.from('transactions').insert(incomeTrans as any);
         } catch (err) {
           console.error("Supabase addIncome error (no cycle):", err);
@@ -858,22 +871,26 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveStateToLocal(updatedCycles, updatedTransactions, debts, updatedSavings);
   };
 
-  // Update active cycle base income without changing the Hand Money wallet
+  // Update active cycle's base income and set Hand Money equal to it
   const updateActiveCycleIncome = async (amount: number) => {
     if (!activeCycle) return;
 
     const updatedCycles = cycles.map(c => c.id === activeCycle.id ? { ...c, income: amount } : c);
     setCycles(updatedCycles);
 
+    const updatedSavings = savings.map(s => s.id === 'wallet-hand' ? { ...s, current_balance: amount } : s);
+    setSavings(updatedSavings);
+
     if (isSupabaseConfigured() && supabase && userId) {
       try {
         await client.from('cycles').update({ income: amount } as any).eq('id', activeCycle.id).eq('user_id', userId);
+        await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand').eq('user_id', userId);
       } catch (err) {
         console.error("Failed to update active cycle income in Supabase:", err);
       }
     }
 
-    saveStateToLocal(updatedCycles, transactions, debts, savings);
+    saveStateToLocal(updatedCycles, transactions, debts, updatedSavings);
   };
 
   // Edit/Adjust a transaction
