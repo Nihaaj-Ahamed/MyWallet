@@ -49,6 +49,7 @@ import {
 export default function Dashboard() {
   const {
     activeCycle,
+    cycles,
     transactions,
     debts,
     savings,
@@ -567,7 +568,7 @@ export default function Dashboard() {
     if (!activeCycle) return;
     setDayCounter({
       cycleId: activeCycle.id,
-      day: 0,
+      day: 1,
       status: 'running',
       lastCountDate: getLocalDateString(),
     });
@@ -711,7 +712,12 @@ export default function Dashboard() {
 
   const calculateDailyTotal = (transList: Transaction[]) => {
     return transList
-      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
+      .filter(t => t.type === 'expense' &&
+        t.category !== 'Savings Sweep' &&
+        t.category !== 'Debt' &&
+        t.category !== 'Debt Settlement' &&
+        !t.description.includes('[DayCycle]')
+      )
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   };
 
@@ -848,34 +854,6 @@ export default function Dashboard() {
         window.print();
       }
     }, 100);
-  };
-
-  // Touch Swipe Gesture State Handlers
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const minSwipeDistance = 50;
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe && activeMobileTab < 3) {
-      setActiveMobileTab(prev => prev + 1);
-    }
-    if (isRightSwipe && activeMobileTab > 0) {
-      setActiveMobileTab(prev => prev - 1);
-    }
   };
 
   // Swiped transaction state in Monthly History
@@ -1282,13 +1260,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* MOBILE SWIPABLE VIEWPORTS */}
-      <div 
-        className="no-print max-w-7xl mx-auto px-4 md:px-8 mt-6 lg:hidden"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
+      {/* Mobile tab content */}
+      <div className="no-print max-w-7xl mx-auto px-4 md:px-8 mt-6 lg:hidden">
         <AnimatePresence mode="wait">
           {activeMobileTab === 0 && (
             <motion.div
@@ -1681,46 +1654,106 @@ export default function Dashboard() {
       {printStatementMonth && (() => {
         const printPrefix = getPrefixFromMonthLabel(printStatementMonth);
         const printTransactions = transactions.filter(t => t.date && t.date.startsWith(printPrefix));
+        const printRegularTransactions = printTransactions.filter(
+          t => !t.description.includes('[DayCycle]')
+        );
+        const printDayCycleTransactions = printTransactions.filter(
+          t => t.type === 'expense' && t.description.includes('[DayCycle]')
+        );
+        const printCycleDeductions = quickDeductionLedger.filter(
+          item => item.date.startsWith(printPrefix)
+        );
         
         const printIncome = printTransactions
           .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
           .reduce((sum, t) => sum + t.amount, 0);
 
-        const printExpenses = printTransactions
+        const printExpenses = printRegularTransactions
           .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-        const printSweeps = printTransactions
+        const printSweeps = printRegularTransactions
           .filter(t => t.category === 'Savings Sweep')
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-        const foodExpenses = printTransactions
+        const foodExpenses = printRegularTransactions
           .filter(t => t.type === 'expense' && t.category === 'Food')
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-        const travelExpenses = printTransactions
+        const travelExpenses = printRegularTransactions
           .filter(t => t.type === 'expense' && t.category.includes('Travel'))
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-        const rentUtilityExpenses = printTransactions
+        const rentUtilityExpenses = printRegularTransactions
           .filter(t => t.type === 'expense' && ['Rent', 'Electricity'].includes(t.category))
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-        const generalExpenses = printTransactions
+        const generalExpenses = printRegularTransactions
           .filter(t => t.type === 'expense' && t.category === 'General')
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-        return (
-          <div className="hidden print:block text-black p-8 bg-white border-2 border-black max-w-4xl mx-auto space-y-6 h-full font-serif">
-            <div className="border-b border-black pb-4 text-center">
-              <h1 className="text-3xl font-bold uppercase tracking-widest font-serif"> VAULT OFFICIAL AUDIT STATEMENT</h1>
-              <p className="text-xs uppercase font-mono text-gray-500 mt-1">Official Asset Ledger & Capital Position</p>
-              <p className="text-xs font-mono mt-0.5">STATEMENT FOR RECORD: {printStatementMonth.toUpperCase()}</p>
-            </div>
+        const printTickedDayCycleExpenses = printDayCycleTransactions
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const printCustomCycleDeduction = printCycleDeductions
+          .reduce((sum, item) => sum + item.amount, 0);
+        const printDetailedDates = Array.from(new Set(
+          printRegularTransactions.map(t => t.date)
+        )).sort((a, b) => b.localeCompare(a));
+        const printCycleSummary = cycles
+          .map((cycle, index) => {
+            const nextCycleStart = cycles[index - 1]?.start_date;
+            const endDate = nextCycleStart && nextCycleStart < cycle.end_date
+              ? nextCycleStart
+              : cycle.end_date;
+            return { cycle, endDate };
+          })
+          .filter(({ cycle, endDate }) =>
+            endDate >= `${printPrefix}-01` &&
+            cycle.start_date <= `${printPrefix}-31`
+          )
+          .reverse()
+          .map(({ cycle, endDate }) => {
+            const dailySpent = new Map<string, number>();
+            const cycleRegularExpenses = transactions.filter(t =>
+              t.cycle_id === cycle.id &&
+              t.date >= cycle.start_date &&
+              t.date <= endDate &&
+              t.type === 'expense' &&
+              !t.description.includes('[DayCycle]') &&
+              t.category !== 'Savings Sweep' &&
+              t.category !== 'Debt' &&
+              t.category !== 'Debt Settlement'
+            );
+            for (const transaction of cycleRegularExpenses) {
+              dailySpent.set(transaction.date,
+                (dailySpent.get(transaction.date) ?? 0) + Math.abs(transaction.amount));
+            }
+            const dailyTotals = [...dailySpent.entries()]
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([, amount]) => amount);
+            const total = dailyTotals.reduce((sum, amount) => sum + amount, 0);
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="border border-black p-4 space-y-2">
-                <h2 className="text-sm font-bold uppercase border-b border-black pb-1">Historical Month Summary</h2>
+            return { cycle, endDate, dailyTotals, total };
+          })
+          .filter(({ cycle, total }) => cycle.id === activeCycle?.id || total > 0);
+
+        return (
+          <div className="print-statement hidden print:block">
+            <header className="print-statement-header">
+              <div>
+                <p>Vault</p>
+                <h1>Monthly Statement</h1>
+                <time dateTime={printPrefix}>{printStatementMonth}</time>
+              </div>
+              <div className="print-statement-total">
+                <span>Net Ledger Balance</span>
+                <strong>Rs. {(printIncome - printExpenses - printTickedDayCycleExpenses - printSweeps).toLocaleString()}</strong>
+              </div>
+            </header>
+
+            <div className="print-statement-summary grid grid-cols-2 gap-4">
+              <div>
+                <h2>Monthly Summary</h2>
                 <div className="flex justify-between text-xs font-mono">
                   <span>Opening Inflows:</span>
                   <span>Rs. {printIncome.toLocaleString()}</span>
@@ -1730,17 +1763,17 @@ export default function Dashboard() {
                   <span>Rs. {printExpenses.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-xs font-mono">
+                  <span>Day Cycle Deductions:</span>
+                  <span>Rs. {(printTickedDayCycleExpenses + printCustomCycleDeduction).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs font-mono">
                   <span>Deposited to Savings:</span>
                   <span>Rs. {printSweeps.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-xs font-mono border-t border-black pt-1 font-bold">
-                  <span>Net Ledger Balance:</span>
-                  <span>Rs. {(printIncome - printExpenses - printSweeps).toLocaleString()}</span>
-                </div>
               </div>
 
-              <div className="border border-black p-4 space-y-2">
-                <h2 className="text-sm font-bold uppercase border-b border-black pb-1">Categories Outlay</h2>
+              <div>
+                <h2>Spending by Category</h2>
                 <div className="flex justify-between text-xs font-mono">
                   <span>Food & Groceries:</span>
                   <span>Rs. {foodExpenses.toLocaleString()}</span>
@@ -1760,61 +1793,112 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="border border-black p-4 space-y-4">
-              <h2 className="text-sm font-bold uppercase border-b border-black pb-1">Detailed Transaction Log</h2>
-              {printTransactions.length === 0 ? (
+            <section>
+              <h2>Day Cycle Deductions</h2>
+              {printDayCycleTransactions.length === 0 && printCycleDeductions.length === 0 ? (
+                <p className="text-xs italic text-gray-500 text-center py-2">No Day Cycle deductions recorded for this period.</p>
+              ) : (
+                <table className="w-full text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-black text-left">
+                      <th className="pb-1 w-1/4">Date</th>
+                      <th className="pb-1 w-1/2">Description</th>
+                      <th className="pb-1 text-right w-1/4">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printDayCycleTransactions.map(t => (
+                      <tr key={t.id}>
+                        <td className="py-1">{t.date}</td>
+                        <td className="py-1">{t.description.replace('[Bank]', '').replace('[Hand]', '').replace('[Option]', '').replace('[DayCycle]', '').trim()}</td>
+                        <td className="py-1 text-right">-Rs. {Math.abs(t.amount).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                    {printCycleDeductions.map((item, index) => (
+                      <tr key={`cycle-deduction-${index}`}>
+                        <td className="py-1">{item.date}</td>
+                        <td className="py-1">{item.description || (item.mode === 'custom' ? 'Custom remaining deduction' : 'Quick remaining deduction')}</td>
+                        <td className="py-1 text-right">-Rs. {item.amount.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+
+            {printCycleSummary.length > 0 && (
+              <section>
+                <h2>Cycle Daily Spending</h2>
+                {printCycleSummary.map(({ cycle, endDate, dailyTotals, total }) => (
+                  <div key={cycle.id} className="print-statement-cycle">
+                    <p className="font-bold">
+                      {cycle.start_date.replaceAll('-', '.')}
+                      {cycle.id !== activeCycle?.id && ` - ${endDate.replaceAll('-', '.')}`}
+                    </p>
+                    <p className="break-words">
+                      {dailyTotals.map(amount => amount.toLocaleString()).join(' + ') || '0'} = <strong>{total.toLocaleString()}</strong>
+                    </p>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            <section>
+              <h2>Transaction Log</h2>
+              {printDetailedDates.length === 0 ? (
                 <p className="text-xs italic text-gray-500 text-center py-4">No transactions recorded for this period.</p>
-              ) : (() => {
-                // Group printTransactions by category
-                const grouped: { [category: string]: Transaction[] } = {};
-                printTransactions.forEach(t => {
-                  const cat = t.category || 'General';
-                  if (!grouped[cat]) {
-                    grouped[cat] = [];
-                  }
-                  grouped[cat].push(t);
-                });
+              ) : (
+                <table className="w-full text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-black text-left">
+                      <th className="pb-1 w-1/5">Date</th>
+                      <th className="pb-1 w-1/6">Category</th>
+                      <th className="pb-1 w-[45%]">Description</th>
+                      <th className="pb-1 text-right w-1/6">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printDetailedDates.map(date => {
+                      const dateTransactions = printRegularTransactions
+                        .filter(t => t.date === date)
+                        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+                      const dailySpent = dateTransactions
+                        .filter(t =>
+                          t.type === 'expense' &&
+                          t.category !== 'Savings Sweep' &&
+                          t.category !== 'Debt' &&
+                          t.category !== 'Debt Settlement'
+                        )
+                        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-                // Get categories present
-                const categories = Object.keys(grouped).sort();
-
-                return (
-                  <div className="space-y-6">
-                    {categories.map((cat, idx) => {
-                      const catTransactions = grouped[cat];
                       return (
-                        <div key={cat} className={`space-y-2 pb-4 ${idx < categories.length - 1 ? 'border-b border-gray-200' : ''}`}>
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-black">[{cat.toUpperCase()}]</h3>
-                          <table className="w-full text-xs font-mono">
-                            <thead>
-                              <tr className="border-b border-black text-left">
-                                <th className="pb-1 w-1/4">Date</th>
-                                <th className="pb-1 w-1/2">Description</th>
-                                <th className="pb-1 text-right w-1/4">Amount</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {catTransactions.map((t, rowIdx) => (
-                                <tr key={t.id} className={rowIdx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                                  <td className="py-1">{t.date}</td>
-                                  <td className="py-1">{t.description}</td>
-                                  <td className="py-1 text-right">{t.amount > 0 ? '+' : '-'}Rs. {Math.abs(t.amount).toLocaleString()}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        <React.Fragment key={date}>
+                          {dateTransactions.map(t => (
+                            <tr
+                              key={t.id}
+                            >
+                              <td className="py-1">{t.date}</td>
+                              <td className="py-1">{t.category || 'General'}</td>
+                              <td className="py-1">{t.description}</td>
+                              <td className="py-1 text-right">{t.amount > 0 ? '+' : '-'}Rs. {Math.abs(t.amount).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                          <tr className="print-statement-subtotal">
+                            <td className="py-2" colSpan={3}>Daily Total Spent - {date}</td>
+                            <td className="py-2 text-right">Rs. {dailySpent.toLocaleString()}</td>
+                          </tr>
+                        </React.Fragment>
                       );
                     })}
-                  </div>
-                );
-              })()}
-            </div>
+                  </tbody>
+                </table>
+              )}
+            </section>
 
-            <div className="pt-12 border-t border-black flex justify-between text-[11px] font-mono text-gray-500">
+            <footer className="print-statement-footer">
               <span>Security ID Reference: VAULT-OFFICIAL-{printStatementMonth.replace(' ', '-').toUpperCase()}</span>
               <span>Ledger Officer Sign: __________________________</span>
-            </div>
+            </footer>
           </div>
         );
       })()}
@@ -2251,7 +2335,11 @@ export default function Dashboard() {
   // TAB 2 RENDER: TODAY LEDGER (Timeline)
   function renderTodayLedger() {
     const todayStr = getLocalDateString();
-    const todayTransactions = transactions.filter(t => t.date && t.date >= todayStr);
+    const todayTransactions = transactions.filter(t =>
+      t.date &&
+      t.date >= todayStr &&
+      !t.description.includes('[DayCycle]')
+    );
     const groupedTimelineToday = groupTransactionsByDate(todayTransactions);
 
     return (
@@ -2280,7 +2368,9 @@ export default function Dashboard() {
 
                   {/* Transactions listed under day */}
                   <div className="space-y-2 pl-1">
-                    {items.map(t => {
+                    {items
+                      .filter(t => t.type === 'expense')
+                      .map(t => {
                       const isExpense = t.type === 'expense';
                       const isBank = t.description.startsWith('[Bank]');
                       const isOption = t.description.startsWith('[Option]');
@@ -2680,7 +2770,9 @@ export default function Dashboard() {
                               </div>
                             );
                           })}
-                        {items.map(t => {
+                        {items
+                          .filter(t => t.type === 'expense')
+                          .map(t => {
                           const isExpense = t.type === 'expense';
                           const isBank = t.description.startsWith('[Bank]');
                           const isOption = t.description.startsWith('[Option]');
@@ -2689,6 +2781,7 @@ export default function Dashboard() {
                           if (descClean.startsWith('[Bank]')) descClean = descClean.replace('[Bank]', '').trim();
                           if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
                           if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
+                          descClean = descClean.replace('[DayCycle]', '').trim();
 
                           return (
                             <div 
@@ -2900,7 +2993,13 @@ export default function Dashboard() {
       .reduce((sum, t) => sum + t.amount, 0);
 
     const monthExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
+      .filter(t =>
+        t.type === 'expense' &&
+        t.category !== 'Savings Sweep' &&
+        t.category !== 'Debt' &&
+        t.category !== 'Debt Settlement' &&
+        !t.description.includes('[DayCycle]')
+      )
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const monthSweeps = monthTransactions
@@ -2909,23 +3008,31 @@ export default function Dashboard() {
 
     // Premium spending outlay categories
     const foodExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category === 'Food')
+      .filter(t => t.type === 'expense' && t.category === 'Food' && !t.description.includes('[DayCycle]')
+      )
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const travelExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category.includes('Travel'))
+      .filter(t => t.type === 'expense' && t.category.includes('Travel') && !t.description.includes('[DayCycle]')
+      )
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const rentUtilityExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && ['Rent', 'Electricity'].includes(t.category))
+      .filter(t => t.type === 'expense' && ['Rent', 'Electricity'].includes(t.category) && !t.description.includes('[DayCycle]')
+      )
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const generalExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category === 'General')
+      .filter(t => t.type === 'expense' && t.category === 'General' && !t.description.includes('[DayCycle]')
+      )
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
+    const regularMonthTransactions = monthTransactions.filter(
+      t => !t.description.includes('[DayCycle]')
+    );
+
     // Group month transactions by date
-    const groupedByDate = monthTransactions.reduce((acc: { [key: string]: Transaction[] }, t) => {
+    const groupedByDate = regularMonthTransactions.reduce((acc: { [key: string]: Transaction[] }, t) => {
       if (!t.date) return acc;
       if (!acc[t.date]) acc[t.date] = [];
       acc[t.date].push(t);

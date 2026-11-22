@@ -941,7 +941,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (cleanDesc.startsWith('[Bank]')) cleanDesc = cleanDesc.replace('[Bank]', '').trim();
     if (cleanDesc.startsWith('[Hand]')) cleanDesc = cleanDesc.replace('[Hand]', '').trim();
     if (cleanDesc.startsWith('[Option]')) cleanDesc = cleanDesc.replace('[Option]', '').trim();
-    const finalDescription = `[${source === 'bank' ? 'Bank' : source === 'option' ? 'Option' : 'Hand'}] ${cleanDesc}`;
+    cleanDesc = cleanDesc.replace('[DayCycle]', '').trim();
+    const keepInDayCycle = origTrans.description.includes('[DayCycle]');
+    const finalDescription = `[${source === 'bank' ? 'Bank' : source === 'option' ? 'Option' : 'Hand'}]${keepInDayCycle ? ' [DayCycle]' : ''} ${cleanDesc}`;
 
     const updatedTrans = transactions.map(t => {
       if (t.id === id) {
