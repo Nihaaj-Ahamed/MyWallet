@@ -531,11 +531,23 @@ export default function Dashboard() {
 
   // Fixed Outflow handlers
   const handlePayOutflow = async (outflow: FixedOutflow) => {
+    const amount = Math.abs(outflow.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Please enter a valid fixed outflow amount.");
+      return;
+    }
+
+    const availableBalance = outflowSource === 'bank' ? bankMoney : handMoney;
+    if (amount > availableBalance) {
+      alert(`Insufficient ${outflowSource === 'bank' ? 'Bank' : 'Hand'} Money for this payment.`);
+      return;
+    }
+
     const category = outflow.id === 'rent' ? 'Rent' : outflow.id === 'elec' ? 'Electricity' : 'General';
     const description = `Fixed Outflow: ${outflow.title}`;
     const date = getLocalDateString();
     
-    await addExpense(outflow.amount, description, category, date, outflowSource);
+    await addExpense(amount, description, category, date, outflowSource);
     
     setOutflows(prev => prev.map(o => {
       if (o.id === outflow.id) {

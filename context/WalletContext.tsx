@@ -294,17 +294,30 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const addExpense = async (amount: number, description: string, category: string, date: string, source: 'hand' | 'bank' = 'hand') => {
     const isBank = source === 'bank';
     const walletId = isBank ? 'wallet-bank' : 'wallet-hand';
-
+    const expenseAmount = Math.abs(amount);
     const currentWalletObj = savings.find(s => s.id === walletId);
-    const newWalletBalance = (currentWalletObj ? currentWalletObj.current_balance : 0) - amount;
+    const newWalletBalance = (currentWalletObj ? currentWalletObj.current_balance : 0) - expenseAmount;
 
-    const updatedSavings = savings.map(s => s.id === walletId ? { ...s, current_balance: newWalletBalance } : s);
+    const walletExists = savings.some(s => s.id === walletId);
+    const updatedSavings = walletExists
+      ? savings.map(s => s.id === walletId ? { ...s, current_balance: newWalletBalance } : s)
+      : [
+          ...savings,
+          {
+            id: walletId,
+            user_id: userId,
+            name: isBank ? 'Bank Money' : 'Hand Money',
+            current_balance: newWalletBalance,
+            target_goal: 0,
+            created_at: new Date().toISOString(),
+          },
+        ];
     setSavings(updatedSavings);
 
     const newTransaction: Transaction = {
       id: crypto.randomUUID(), user_id: userId,
       cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
-      amount: -Math.abs(amount), // Negative for expense
+      amount: -expenseAmount, // Negative for expense
       type: 'expense',
       category: category as any,
       description: `[${source === 'bank' ? 'Bank' : 'Hand'}] ${description}`,
@@ -317,7 +330,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (isSupabaseConfigured() && supabase && userId) {
       try {
-        await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
+        await client.from('savings_vault').upsert({
+          id: walletId,
+          user_id: userId,
+          name: isBank ? 'Bank Money' : 'Hand Money',
+          current_balance: newWalletBalance,
+          target_goal: 0,
+          created_at: currentWalletObj?.created_at || new Date().toISOString(),
+        } as any);
         await client.from('transactions').insert(newTransaction as any);
       } catch (err) {
         console.error("Supabase insert expense error:", err);
