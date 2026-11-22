@@ -38,7 +38,7 @@ interface WalletContextType {
   savingMoney: number;
   optionMoney: number;
   updateWalletBalance: (id: string, amount: number) => Promise<void>;
-  addExpense: (amount: number, description: string, category: string, date: string, source?: 'hand' | 'bank') => Promise<void>;
+  addExpense: (amount: number, description: string, category: string, date: string, source?: 'hand' | 'bank', countInDayCycle?: boolean) => Promise<void>;
   addIncome: (amount: number, description: string, destination: 'hand' | 'bank' | 'option', setCycle: boolean, startDate?: string, endDate?: string) => Promise<void>;
   addWithdrawal: (amount: number, date: string) => Promise<void>;
   addDebt: (amount: number, personName: string, type: 'lent' | 'borrowed', description: string, source?: 'hand' | 'bank') => Promise<void>;
@@ -291,7 +291,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Log expense (deducts from Hand Money by default, or Bank Money if specified)
-  const addExpense = async (amount: number, description: string, category: string, date: string, source: 'hand' | 'bank' = 'hand') => {
+  const addExpense = async (amount: number, description: string, category: string, date: string, source: 'hand' | 'bank' = 'hand', countInDayCycle = false) => {
     const isBank = source === 'bank';
     const walletId = isBank ? 'wallet-bank' : 'wallet-hand';
     const expenseAmount = Math.abs(amount);
@@ -320,7 +320,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       amount: -expenseAmount, // Negative for expense
       type: 'expense',
       category: category as any,
-      description: `[${source === 'bank' ? 'Bank' : 'Hand'}] ${description}`,
+      description: `[${source === 'bank' ? 'Bank' : 'Hand'}]${countInDayCycle ? ' [DayCycle]' : ''} ${description}`,
       date,
       created_at: new Date().toISOString(),
     };

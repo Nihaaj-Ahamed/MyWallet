@@ -45,6 +45,7 @@ export default function FABModal() {
   // Income destination state
   const [incomeDestination, setIncomeDestination] = useState<'hand' | 'bank' | 'option'>('bank');
   const [startNewCycleWithIncome, setStartNewCycleWithIncome] = useState(false);
+  const [countExpenseInDayCycle, setCountExpenseInDayCycle] = useState(false);
 
   // Debt states
   const [personName, setPersonName] = useState('');
@@ -64,6 +65,7 @@ export default function FABModal() {
     setPaymentSource('hand');
     setIncomeDestination('bank');
     setStartNewCycleWithIncome(false);
+    setCountExpenseInDayCycle(false);
     setPersonName('');
     setDebtType('lent');
     setDebtSource('hand');
@@ -88,7 +90,7 @@ export default function FABModal() {
       if (activeTab === 'expense') {
         const numAmount = parseFloat(amount);
         if (isNaN(numAmount) || numAmount <= 0) return;
-        await addExpense(numAmount, description || 'General Expense', category, date, paymentSource);
+        await addExpense(numAmount, description || 'General Expense', category, date, paymentSource, countExpenseInDayCycle);
       } else if (activeTab === 'income') {
         const numAmount = parseFloat(amount);
         if (isNaN(numAmount) || numAmount <= 0) return;
@@ -294,6 +296,18 @@ export default function FABModal() {
                         className="glass-input w-full rounded-xl px-4 py-3 text-sm placeholder:text-slate-400/60"
                       />
                     </div>
+
+                    <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-700/50 dark:bg-[#22302C]">
+                      <input
+                        type="checkbox"
+                        checked={countExpenseInDayCycle}
+                        onChange={(event) => setCountExpenseInDayCycle(event.target.checked)}
+                        className="h-4 w-4 accent-charcoal dark:accent-[#4DB6AC]"
+                      />
+                      <span className="text-xs font-bold text-charcoal dark:text-[#E0E0E0]">
+                        Count this expense in the Day Cycle remaining
+                      </span>
+                    </label>
                   </>
                 )}
 

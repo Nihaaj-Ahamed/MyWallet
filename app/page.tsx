@@ -182,6 +182,93 @@ export default function Dashboard() {
     return `${year}-${month}-${day}`;
   });
 
+  interface QuickCycleDeduction {
+    cycleId: string;
+    date: string;
+    amount: number;
+    description?: string;
+    mode?: 'quick' | 'custom';
+  }
+
+  interface DayCounterState {
+    cycleId: string;
+    day: number;
+    status: 'running' | 'paused';
+    lastCountDate: string | null;
+  }
+
+  const [quickDeductionAmount, setQuickDeductionAmount] = useState('1000');
+  const [customQuickDeduction, setCustomQuickDeduction] = useState(false);
+  const [customQuickAmount, setCustomQuickAmount] = useState('');
+  const [customQuickDescription, setCustomQuickDescription] = useState('');
+  const [editingQuickIndex, setEditingQuickIndex] = useState<number | null>(null);
+  const [editQuickAmount, setEditQuickAmount] = useState('');
+  const [editQuickDescription, setEditQuickDescription] = useState('');
+  const [revealedQuickIndex, setRevealedQuickIndex] = useState<number | null>(null);
+  const [quickSwipeStartX, setQuickSwipeStartX] = useState<number | null>(null);
+  const [quickDeductionLedger, setQuickDeductionLedger] = useState<QuickCycleDeduction[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('vault_day_cycle_quick_deductions') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [dayCounter, setDayCounter] = useState<DayCounterState>({
+    cycleId: '',
+    day: 0,
+    status: 'running',
+    lastCountDate: null,
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('vault_day_cycle_quick_deductions', JSON.stringify(quickDeductionLedger));
+  }, [quickDeductionLedger]);
+
+  useEffect(() => {
+    if (!activeCycle) return;
+    const saved = localStorage.getItem(`vault_day_counter_${activeCycle.id}`);
+    if (saved) {
+      try {
+        setDayCounter(JSON.parse(saved));
+        return;
+      } catch {
+        // Fall through to a fresh counter.
+      }
+    }
+    setDayCounter({
+      cycleId: activeCycle.id,
+      day: 0,
+      status: 'running',
+      lastCountDate: getLocalDateString(),
+    });
+  }, [activeCycle?.id]);
+
+  useEffect(() => {
+    if (!activeCycle) return;
+    localStorage.setItem(`vault_day_counter_${activeCycle.id}`, JSON.stringify(dayCounter));
+  }, [activeCycle?.id, dayCounter]);
+
+  useEffect(() => {
+    if (!activeCycle || dayCounter.status !== 'running') return;
+
+    const advanceAtMidnight = () => {
+      const today = getLocalDateString();
+      if (dayCounter.lastCountDate === today) return;
+      setDayCounter(prev => ({
+        cycleId: activeCycle.id,
+        day: prev.day + 1,
+        status: 'running',
+        lastCountDate: today,
+      }));
+    };
+
+    advanceAtMidnight();
+    const interval = window.setInterval(advanceAtMidnight, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeCycle?.id, dayCounter.status, dayCounter.lastCountDate]);
+
   // Expanded monthly accordion states (stores expanded status per monthYear string)
   const [expandedMonths, setExpandedMonths] = useState<{ [key: string]: boolean }>({});
 
@@ -339,10 +426,18 @@ export default function Dashboard() {
     : [];
   const cycleBaseIncome = activeCycle?.income || 0;
   const totalCycleIncome = cycleBaseIncome;
-
-  const cycleExpenses = cycleTransactions
-    .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
+  const quickCycleSpent = activeCycle
+    ? quickDeductionLedger
+        .filter(item => item.cycleId === activeCycle.id)
+        .reduce((sum, item) => sum + item.amount, 0)
+    : 0;
+  const tickedCycleExpenses = cycleTransactions
+    .filter(t =>
+      t.type === 'expense' &&
+      t.description.includes('[DayCycle]')
+    )
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const cycleExpenses = tickedCycleExpenses + quickCycleSpent;
   
   const remainingCycleBalance = Math.max(0, cycleBaseIncome - cycleExpenses);
 
@@ -393,6 +488,98 @@ export default function Dashboard() {
       await updateActiveCycleIncome(val);
     }
     setEditingCycleIncome(false);
+  };
+
+  const handleQuickCycleDeduction = () => {
+    if (!activeCycle) return;
+    const amount = Math.abs(parseFloat(quickDeductionAmount));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Please enter a valid Day Cycle deduction.");
+      return;
+    }
+
+    const today = getLocalDateString();
+    const alreadyDeductedToday = quickDeductionLedger.some(
+      item => item.cycleId === activeCycle.id && item.date === today && item.mode !== 'custom',
+    );
+    if (alreadyDeductedToday) {
+      alert("Only one quick deduction is allowed per day.");
+      return;
+    }
+
+    setQuickDeductionLedger(prev => [
+      ...prev,
+      { cycleId: activeCycle.id, date: today, amount, mode: 'quick' },
+    ]);
+  };
+
+  const handleCustomQuickCycleDeduction = () => {
+    if (!activeCycle) return;
+    const amount = Math.abs(parseFloat(customQuickAmount));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Please enter a valid custom deduction amount.");
+      return;
+    }
+
+    setQuickDeductionLedger(prev => [
+      ...prev,
+      {
+        cycleId: activeCycle.id,
+        date: getLocalDateString(),
+        amount,
+        description: customQuickDescription.trim() || 'Custom remaining deduction',
+        mode: 'custom',
+      },
+    ]);
+    setCustomQuickAmount('');
+    setCustomQuickDescription('');
+  };
+
+  const handleStartEditQuickDeduction = (index: number, item: QuickCycleDeduction) => {
+    setEditingQuickIndex(index);
+    setEditQuickAmount(item.amount.toString());
+    setEditQuickDescription(item.description || '');
+  };
+
+  const handleSaveQuickDeduction = (index: number) => {
+    const amount = Math.abs(parseFloat(editQuickAmount));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Please enter a valid deduction amount.");
+      return;
+    }
+
+    setQuickDeductionLedger(prev => prev.map((item, itemIndex) =>
+      itemIndex === index
+        ? { ...item, amount, description: editQuickDescription.trim() || item.description }
+        : item
+    ));
+    setEditingQuickIndex(null);
+  };
+
+  const handleDeleteQuickDeduction = (index: number) => {
+    if (!confirm("Delete this Day Cycle deduction?")) return;
+    setQuickDeductionLedger(prev => prev.filter((_, itemIndex) => itemIndex !== index));
+    setEditingQuickIndex(null);
+    setRevealedQuickIndex(null);
+  };
+
+  const handleResetDayCounter = () => {
+    if (!activeCycle) return;
+    setDayCounter({
+      cycleId: activeCycle.id,
+      day: 0,
+      status: 'running',
+      lastCountDate: getLocalDateString(),
+    });
+  };
+
+  const handleToggleDayCounter = () => {
+    if (!activeCycle) return;
+    setDayCounter(prev => ({
+      ...prev,
+      cycleId: activeCycle.id,
+      status: prev.status === 'running' ? 'paused' : 'running',
+    }));
   };
 
   // Outflow direct text editing
@@ -2103,6 +2290,7 @@ export default function Dashboard() {
                       if (descClean.startsWith('[Bank]')) descClean = descClean.replace('[Bank]', '').trim();
                       if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
                       if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
+                      descClean = descClean.replace('[DayCycle]', '').trim();
 
                       return (
                         <div 
@@ -2176,13 +2364,27 @@ export default function Dashboard() {
       return acc;
     }, {});
 
+    // Include quick deductions even if there is no transaction ledger entry.
+    const quickDeductionDates = activeCycle
+      ? quickDeductionLedger
+          .filter(item => item.cycleId === activeCycle.id)
+          .map(item => item.date)
+      : [];
     // Sort dates chronologically newest first
-    const sortedCycleDates = Object.keys(groupedCycleTransactions).sort((a, b) => b.localeCompare(a));
+    const sortedCycleDates = Array.from(
+      new Set([...Object.keys(groupedCycleTransactions), ...quickDeductionDates]),
+    ).sort((a, b) => b.localeCompare(a));
 
-    const calculateDailySpent = (items: Transaction[]) => {
-      return items
-        .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
+    const calculateDailySpent = (items: Transaction[] = [], date: string) => {
+      const transactionSpent = items
+        .filter(t => t.type === 'expense' && t.description.includes('[DayCycle]'))
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      const quickSpent = activeCycle
+        ? quickDeductionLedger
+            .filter(item => item.cycleId === activeCycle.id && item.date === date)
+            .reduce((sum, item) => sum + item.amount, 0)
+        : 0;
+      return transactionSpent + quickSpent;
     };
 
     return (
@@ -2270,6 +2472,114 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Day Cycle-only quick controls */}
+        <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-sage">Day Count</p>
+              <p className="mt-1 text-xl font-extrabold text-charcoal">Day {dayCounter.day}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleToggleDayCounter}
+                className="min-h-[44px] rounded-full border border-slate-200 bg-white px-3 text-[10px] font-bold text-charcoal"
+              >
+                {dayCounter.status === 'running' ? 'Stop' : 'Resume'}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetDayCounter}
+                className="min-h-[44px] rounded-full border border-slate-200 bg-white px-3 text-[10px] font-bold text-charcoal"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200/50 pt-3">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-sage">Quick remaining deduction</p>
+            <label className="flex min-h-[44px] cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                checked={customQuickDeduction}
+                onChange={(event) => setCustomQuickDeduction(event.target.checked)}
+                className="h-4 w-4 accent-charcoal dark:accent-[#4DB6AC]"
+              />
+              <span className="text-xs font-bold text-charcoal dark:text-[#E0E0E0]">
+                Custom deduction
+              </span>
+            </label>
+
+            {!customQuickDeduction ? (
+              <>
+                <div className="mt-2 flex gap-2">
+                  <span className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-sage">Rs.</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={quickDeductionAmount}
+                      onChange={(event) => setQuickDeductionAmount(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-8 pr-3 text-sm font-bold text-charcoal"
+                      aria-label="Quick deduction amount"
+                    />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleQuickCycleDeduction}
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-rose-500 text-white"
+                    aria-label="Subtract quick deduction"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="mt-2 text-[9px] font-medium text-sage">
+                  One quick deduction per day. This does not change Hand or Bank Money.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <span className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-sage">Rs.</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={customQuickAmount}
+                      onChange={(event) => setCustomQuickAmount(event.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-8 pr-3 text-sm font-bold text-charcoal"
+                      placeholder="Amount"
+                      aria-label="Custom deduction amount"
+                    />
+                  </span>
+                  <input
+                    type="text"
+                    value={customQuickDescription}
+                    onChange={(event) => setCustomQuickDescription(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-charcoal"
+                    placeholder="Description"
+                    aria-label="Custom deduction description"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCustomQuickCycleDeduction}
+                  className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-rose-500 text-white text-xs font-bold"
+                >
+                  <Minus className="h-4 w-4" />
+                  Deduct amount
+                </button>
+                <p className="mt-2 text-[9px] font-medium text-sage">
+                  No day limit. This does not change Hand or Bank Money.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Dynamic Daily Spent Accordions */}
         <div className="space-y-3 mt-4">
           <h4 className="text-[10px] font-bold uppercase tracking-wider text-sage">Daily Spent Ledger</h4>
@@ -2278,8 +2588,8 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-2">
               {sortedCycleDates.map(dateStr => {
-                const items = groupedCycleTransactions[dateStr];
-                const dailySpent = calculateDailySpent(items);
+                const items = groupedCycleTransactions[dateStr] || [];
+                const dailySpent = calculateDailySpent(items, dateStr);
                 const isExpanded = !!expandedCycleDates[dateStr];
                 
                 // Format date string for display (e.g., YYYY-MM-DD to DD/MM/YYYY)
@@ -2304,6 +2614,72 @@ export default function Dashboard() {
                     {/* Expandable Panel */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 p-3 space-y-3 bg-slate-50/50">
+                        {activeCycle && quickDeductionLedger
+                          .filter(item => item.cycleId === activeCycle.id && item.date === dateStr)
+                          .map((item) => {
+                            const ledgerIndex = quickDeductionLedger.findIndex(candidate => candidate === item);
+                            const isEditing = editingQuickIndex === ledgerIndex;
+                            const isRevealed = revealedQuickIndex === ledgerIndex;
+
+                            if (isEditing) {
+                              return (
+                                <div key={`${item.date}-${ledgerIndex}`} className="grid grid-cols-[1fr_1fr_auto] gap-2 rounded-2xl border border-slate-100 bg-white p-3">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={editQuickAmount}
+                                    onChange={(event) => setEditQuickAmount(event.target.value)}
+                                    className="min-w-0 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-charcoal"
+                                    aria-label="Edit deduction amount"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editQuickDescription}
+                                    onChange={(event) => setEditQuickDescription(event.target.value)}
+                                    className="min-w-0 rounded-xl border border-slate-200 px-3 py-2 text-xs text-charcoal"
+                                    placeholder="Description"
+                                    aria-label="Edit deduction description"
+                                  />
+                                  <div className="flex gap-1">
+                                    <button type="button" onClick={() => handleSaveQuickDeduction(ledgerIndex)} className="flex h-10 w-10 items-center justify-center rounded-full bg-charcoal text-white" title="Save">
+                                      <Check className="h-4 w-4" />
+                                    </button>
+                                    <button type="button" onClick={() => setEditingQuickIndex(null)} className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-sage" title="Cancel">
+                                      <X className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={`${item.date}-${ledgerIndex}`}
+                                className="relative overflow-hidden rounded-2xl touch-pan-y"
+                                onPointerDown={(event) => setQuickSwipeStartX(event.clientX)}
+                                onPointerUp={(event) => {
+                                  if (quickSwipeStartX === null) return;
+                                  const delta = event.clientX - quickSwipeStartX;
+                                  if (delta < -35) setRevealedQuickIndex(ledgerIndex);
+                                  if (delta > 35) setRevealedQuickIndex(null);
+                                  setQuickSwipeStartX(null);
+                                }}
+                              >
+                                <div className={`absolute inset-y-0 right-0 flex ${isRevealed ? 'z-10' : 'z-0'}`}>
+                                  <button type="button" onClick={() => handleStartEditQuickDeduction(ledgerIndex, item)} className="flex w-12 items-center justify-center bg-amber-400 text-charcoal" title="Edit deduction">
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button type="button" onClick={() => handleDeleteQuickDeduction(ledgerIndex)} className="flex w-12 items-center justify-center bg-rose-500 text-white" title="Delete deduction">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                <div className={`relative flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-3 transition-transform duration-200 ${isRevealed ? '-translate-x-24' : 'translate-x-0'}`}>
+                                  <span className="truncate text-xs font-bold text-charcoal">{item.description || 'Quick remaining deduction'}</span>
+                                  <span className="ml-2 text-xs font-extrabold text-rose-500">- Rs. {item.amount.toLocaleString()}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         {items.map(t => {
                           const isExpense = t.type === 'expense';
                           const isBank = t.description.startsWith('[Bank]');

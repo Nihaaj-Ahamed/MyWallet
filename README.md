@@ -1,6 +1,6 @@
-# The Vault (MyWallet) — Premium Financial Asset Ledger
+# MyWallet — Financial Asset Ledger
 
-An ultra-premium, production-ready financial tracking web application featuring a mathematically perfect discrepancy reconciliation engine, dynamic mobile viewports, privacy sensitive masking, and premium theme accent selectors.
+MyWallet is a responsive financial tracker for income, expenses, debts, bank cash, hand cash, savings, and 10-calendar-day Day Cycles. It supports Supabase authentication and PWA installation.
 
 Developed by **Nihaaj Ahamed MS** 
 
@@ -8,48 +8,75 @@ Developed by **Nihaaj Ahamed MS**
 
 ## Key Features
 
-### 1. Today Ledger & Future Persistence
-- **Hyper-Focus View:** The "Today Ledger" tab displays transactions matching the current local date along with any post-dated future transactions (e.g. post-dated checks, future logs).
-- **Auto-Rollover:** The previous day's transactions automatically hide from this view as soon as local midnight passes.
-- **Continuous Ledger:** Starting a new cycle never clears or resets historical transactions or account balances; the data persists across the continuous ledger.
+### 1. Today Ledger
+- Displays the current and future-dated transaction timeline.
+- Transactions are grouped by date.
+- Starting a new cycle does not clear historical transactions or wallet balances.
 
-### 2. Multi-Theme Accent Switcher
-- Swap accents dynamically with zero layout displacement or Obsidian black body resets:
-  * **Champagne Gold:** Default luxury gold accents (`#D4AF37`)
-  * **Royal Emerald:** High-end jewel emerald accents (`#00E676`)
-  * **Velvet Crimson / Rose Gold:** Premium copper pink accent (`#FF5252`)
+### 2. Account and Profile
+- Supabase sign-in and sign-up.
+- Email confirmation and password reset.
+- Profile page for changing the display name and password.
+- Account sign-out.
+- Light and dark appearance modes.
 
-### 3. Privacy Sensitive Blurring (Shutter Eye)
-- Protect your capital position instantly. A clean Gaussian blur (`filter: blur(8px)`) masks sensitive numeric fields representing Net Worth, Bank Money, Hand Cash, Savings Vault, and Option Money.
-- Easily toggle visibility with a single tap of the header "Eye" button.
+### 3. Independent Wallet Balances
+- **Bank Money** and **Hand Money** are tracked independently.
+- Expenses deduct only from the selected payment source.
+- Income destinations remain independent.
+- Fixed outflows deduct from the selected Hand or Bank wallet.
+- Cash withdrawals transfer money from Bank to Hand.
+- Income added to a wallet never replaces that wallet's existing balance.
 
-### 4. Zero-Hover Mobile touch optimizations
-- Eliminated all `:hover` and `group-hover` interactive dependencies that break on mobile screens.
-- Enlarged all interactive targets, action items, toggles, and detail collapses to at least `min-height: 44px` with physical tap-scale feedback (`active:scale-95`).
+### 4. Day Cycle
+- The active cycle contains 10 calendar days, from its base-income date through 9 days later.
+- Base Income minus cycle spending determines Remaining.
+- Hand Money and Remaining are separate values.
+- Normal income can be added to the active cycle base income.
+- The Income form checkbox starts a new Day Cycle instead.
+- Only ticked expenses and cycle deductions reduce Day Cycle Remaining.
+- Unticked expenses affect the wallet and ledger without changing cycle Remaining.
 
-### 5. Dynamic 3-Month Archive Accordion
-- Fully dynamic accordions representing the last three calendar months.
-- Automatically calculates:
-  * **Opening Inflows** (Total Income)
-  * **Period Expenses** (Total Outflows)
-  * **Savings Sweeps** (Total Swept to Savings)
-  * **Net Ledger Balance**
-- Displays a 4-quadrant dynamic spending outlay card:
-  1. Food & Groceries
-  2. Commutes & Highway
-  3. Rent & Utility Bills
-  4. General / Subscriptions
-- An expandable date timeline details specific entries per date row.
+### 5. Day Cycle Deductions
+- **Quick deduction** defaults to Rs. 1000 and permits one deduction per day.
+- **Custom deduction** accepts an amount and description and can be used multiple times per day.
+- Custom toggle mode uses no daily limit.
+- Quick and custom deductions do not deduct from Hand or Bank Money.
+- Deductions appear in the Daily Spent Ledger.
+- Swipe a deduction left to reveal Edit and Delete actions.
+- Edit updates amount or description; delete removes it and recalculates Remaining.
 
-### 6. Print Statement Parity
-- A print-only ledger layout styled as a bank statement. Includes dynamic summaries, outlays, and list records corresponding exactly to the selected month.
+### 6. Automatic Day Count
+- The Day Count increases automatically at midnight.
+- Reset sets the Day Count to 0.
+- Stop pauses automatic counting.
+- Resume restarts automatic counting.
+- The toolbar Plus button remains independent and opens the ledger entry form.
+
+### 7. Monthly Archive
+- Monthly income, expenses, savings sweeps, category totals, and transaction timelines are available through expandable monthly sections.
+
+### 8. PWA
+- Installable application manifest.
+- Standalone mobile and desktop display.
+- Service worker registration.
+- Offline app-shell caching.
+
+### 9. Privacy and Mobile
+- Privacy blur hides monetary values.
+- Mobile controls use 44px minimum touch targets.
+- Touch actions use active scaling rather than hover-dependent behavior.
+
+### 10. Print Statements
+- Print-only bank-statement layout includes selected-month summaries and ledger records.
 
 ---
 
 ## Tech Stack
-- **Framework:** Next.js (App Router)
-- **State Management:** React Context (Supabase database integration + local backup recovery)
-- **Styling:** Tailwind CSS + custom glassmorphic properties
+- **Framework:** Next.js 16 App Router
+- **Authentication/Database:** Supabase
+- **State Management:** React Context
+- **Styling:** Tailwind CSS
 - **Animations:** Framer Motion
 - **Icons:** Lucide React
 
