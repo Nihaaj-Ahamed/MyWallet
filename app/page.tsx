@@ -347,7 +347,9 @@ export default function Dashboard() {
     .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  const remainingCycleBalance = handMoney;
+  // Remaining cycle budget is cycle income minus expenses.
+  // Hand Money remains a separate wallet balance.
+  const remainingCycleBalance = totalCycleIncome - cycleExpenses;
 
   // Active month total income (base + extra incomes)
   const activeMonthIncome = activeTransactions

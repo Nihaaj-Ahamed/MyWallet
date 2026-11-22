@@ -44,6 +44,7 @@ export default function FABModal() {
 
   // Income destination state
   const [incomeDestination, setIncomeDestination] = useState<'hand' | 'bank' | 'option'>('bank');
+  const [startNewCycle, setStartNewCycle] = useState(false);
 
   // Debt states
   const [personName, setPersonName] = useState('');
@@ -62,6 +63,7 @@ export default function FABModal() {
     setDate(new Date().toISOString().split('T')[0]);
     setPaymentSource('hand');
     setIncomeDestination('bank');
+    setStartNewCycle(false);
     setPersonName('');
     setDebtType('lent');
     setDebtSource('hand');
@@ -94,9 +96,18 @@ export default function FABModal() {
           numAmount,
           description || 'Additional Income',
           incomeDestination,
-          false,
+          startNewCycle,
           date,
-          undefined
+          startNewCycle
+            ? (() => {
+                const [year, month, day] = date.split('-').map(Number);
+                const end = new Date(year, month - 1, day + 9);
+                const endYear = end.getFullYear();
+                const endMonth = String(end.getMonth() + 1).padStart(2, '0');
+                const endDay = String(end.getDate()).padStart(2, '0');
+                return `${endYear}-${endMonth}-${endDay}`;
+              })()
+            : undefined
         );
       } else if (activeTab === 'withdrawal') {
         const numAmount = parseFloat(amount);
@@ -370,6 +381,21 @@ export default function FABModal() {
                         className="glass-input w-full rounded-xl px-4 py-3 text-sm placeholder:text-slate-400/60"
                       />
                     </div>
+
+                    <label className="flex items-start gap-3 rounded-xl border border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#22302C] p-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={startNewCycle}
+                        onChange={(event) => setStartNewCycle(event.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-charcoal"
+                      />
+                      <span>
+                        <span className="block text-xs font-bold text-charcoal dark:text-[#E0E0E0]">Start a new Day Cycle</span>
+                        <span className="mt-0.5 block text-[10px] leading-relaxed text-sage">
+                          When checked, this income becomes the base income of a new 10-day cycle. Leave unchecked to add it to the current cycle.
+                        </span>
+                      </span>
+                    </label>
                   </>
                 )}
 
