@@ -913,7 +913,7 @@ export default function Dashboard() {
   };
 
   return (
-    <main className={`min-h-screen bg-transparent pb-32 print:pb-0 theme-${theme}`}>
+    <main className={`min-h-screen bg-transparent pb-32 print:min-h-0 print:pb-0 theme-${theme}`}>
       
       <Header theme={theme} setTheme={setTheme} />
 
@@ -1622,6 +1622,73 @@ export default function Dashboard() {
       );
     };
     const printTransactions = transactions.filter(t => t.date && t.date.startsWith(printPrefix));
+    type WalletLabel = 'Bank Money' | 'Hand Money' | 'Option Money' | 'Unspecified';
+    type WalletActivity = {
+      key: string;
+      date: string;
+      wallet: WalletLabel;
+      description: string;
+      category: string;
+      amount: number;
+    };
+    const walletActivity = printTransactions
+      .filter(t => t.category !== 'Debt' && t.category !== 'Debt Settlement')
+      .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
+      .flatMap((transaction): WalletActivity[] => {
+        const { id, date, description, category, amount } = transaction;
+        if (description.startsWith('[Withdrawal]')) {
+          const transfer = { date, category: 'Transfer', description: 'Cash withdrawal from Bank to Hand' };
+          return [
+            { ...transfer, key: `${id}-bank`, wallet: 'Bank Money', amount: -Math.abs(amount) },
+            { ...transfer, key: `${id}-hand`, wallet: 'Hand Money', amount: Math.abs(amount) },
+          ];
+        }
+
+        const walletTag = /^\[(Bank|Hand|Option)\]\s*/.exec(description);
+        const wallet: WalletLabel = walletTag?.[1] === 'Bank' ? 'Bank Money'
+          : walletTag?.[1] === 'Hand' ? 'Hand Money'
+          : walletTag?.[1] === 'Option' ? 'Option Money'
+          : category === 'Savings Sweep' || category === 'Adjustment' ? 'Hand Money'
+          : 'Unspecified';
+        const detail = description.replace(/^\[(Bank|Hand|Option)\]\s*/, '').replace('[DayCycle]', '').trim();
+        return [{ key: id, date, wallet, category, description: detail, amount }];
+      });
+    const walletOutflows = (wallet: WalletLabel) => walletActivity.filter(item => item.wallet === wallet && item.amount < 0);
+    const formatWalletAmount = (amount: number) =>
+      `${amount < 0 ? '-' : amount > 0 ? '+' : ''}Rs. ${Math.abs(amount).toLocaleString()}`;
+    const renderWalletActivity = (items: WalletActivity[], showWallet = false) => (
+      <table className="w-full text-xs font-mono">
+        <thead>
+          <tr className="text-left">
+            <th scope="col">Date</th>
+            {showWallet && <th scope="col">Wallet</th>}
+            <th scope="col">Type</th>
+            <th scope="col">Description</th>
+            <th scope="col" className="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.length === 0 && (
+            <tr>
+              <td colSpan={showWallet ? 5 : 4} className="italic">No entries for this period.</td>
+            </tr>
+          )}
+          {items.map(item => (
+            <tr key={item.key}>
+              <td>{item.date}</td>
+              {showWallet && <td>{item.wallet}</td>}
+              <td>{item.category}</td>
+              <td>{item.description}</td>
+              <td className="text-right">{formatWalletAmount(item.amount)}</td>
+            </tr>
+          ))}
+          <tr className="print-statement-subtotal">
+            <th scope="row" colSpan={showWallet ? 4 : 3} className="text-left">Total</th>
+            <td className="text-right">{formatWalletAmount(items.reduce((total, item) => total + item.amount, 0))}</td>
+          </tr>
+        </tbody>
+      </table>
+    );
     const printRegularTransactions = printTransactions.filter(
       t => !t.description.includes('[DayCycle]')
     );
@@ -1691,24 +1758,25 @@ export default function Dashboard() {
           </tr>
         </thead>
         <tbody>
-          {days.map(({ date, items, spent }) => (
-            <React.Fragment key={date}>
-              {items.map(t => (
-                <tr key={t.id} {...(forPrint ? {} : swipeHandlers<HTMLTableRowElement>(`history-${t.id}`))}>
-                  {forPrint && <td className="py-1">{date}</td>}
-                  <td className="py-1">{t.category || 'General'}</td>
-                  <td className="py-1">{t.description}</td>
-                  {renderTransactionAmount(t, `${t.amount > 0 ? '+' : '-'}Rs. ${Math.abs(t.amount).toLocaleString()}`)}
-                </tr>
-              ))}
+          {days.flatMap(({ date, items, spent }) => items.map((t, index) => (
+            <tr
+              key={t.id}
+              className={forPrint && index === 0 ? 'print-statement-day-start' : undefined}
+              {...(forPrint ? {} : swipeHandlers<HTMLTableRowElement>(`history-${t.id}`))}
+            >
               {forPrint && (
-                <tr className="print-statement-subtotal">
-                  <td className="py-2" colSpan={3}>Daily Total Spent - {date}</td>
-                  <td className="py-2 text-right">Rs. {spent.toLocaleString()}</td>
-                </tr>
+                <td>
+                  {index === 0 && <>
+                    <strong>{date}</strong>
+                    <span className="print-statement-day-spent">Spent Rs. {spent.toLocaleString()}</span>
+                  </>}
+                </td>
               )}
-            </React.Fragment>
-          ))}
+              <td className="py-1">{t.category || 'General'}</td>
+              <td className="py-1">{t.description}</td>
+              {renderTransactionAmount(t, `${t.amount > 0 ? '+' : '-'}Rs. ${Math.abs(t.amount).toLocaleString()}`)}
+            </tr>
+          )))}
         </tbody>
       </table>
     );
@@ -1804,6 +1872,20 @@ export default function Dashboard() {
             </div>
           </>)}
         </div>
+
+        {renderSection("Wallet Activity", <div className="statement-wallet-activity">
+          {renderSection("Income & Money In", renderWalletActivity(walletActivity.filter(item => item.amount > 0), true))}
+          {renderSection("Hand Money Outflows", renderWalletActivity(walletOutflows('Hand Money')))}
+          {renderSection("Bank Money Outflows", renderWalletActivity(walletOutflows('Bank Money')))}
+          {(['Option Money', 'Unspecified'] as const).map(wallet => {
+            const items = walletOutflows(wallet);
+            return items.length > 0 && (
+              <React.Fragment key={wallet}>
+                {renderSection(wallet === 'Unspecified' ? 'Outflows With Unspecified Wallet' : 'Option Money Outflows', renderWalletActivity(items))}
+              </React.Fragment>
+            );
+          })}
+        </div>)}
 
         {renderSection("Day Cycle Deductions", <>
           {printDayCycleTransactions.length === 0 && printCycleDeductions.length === 0 ? (
@@ -2257,6 +2339,8 @@ export default function Dashboard() {
     const todayTransactions = transactions.filter(t =>
       t.date &&
       t.date >= todayStr &&
+      t.category !== 'Debt' &&
+      t.category !== 'Debt Settlement' &&
       !isFixedOutflowExpense(t) &&
       !t.description.includes('[DayCycle]')
     );
