@@ -1664,9 +1664,55 @@ export default function Dashboard() {
       .reduce((sum, item) => sum + item.amount, 0);
     const printTotalCycleDeductions = printCycleTransactionSpent + printQuickCycleDeduction;
     const printLogTransactions = printRegularTransactions.filter(t => !isFixedOutflowExpense(t));
-    const printDetailedDates = Array.from(new Set(
-      printLogTransactions.map(t => t.date)
-    )).sort((a, b) => b.localeCompare(a));
+    const logByDate = new Map<string, Transaction[]>();
+    for (const transaction of printLogTransactions) {
+      const day = logByDate.get(transaction.date);
+      if (day) day.push(transaction);
+      else logByDate.set(transaction.date, [transaction]);
+    }
+    const logDays = [...logByDate.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, items]) => ({
+        date,
+        items: items.sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        spent: items
+          .filter(t => t.type === 'expense' && !['Savings Sweep', 'Debt', 'Debt Settlement'].includes(t.category))
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0),
+      }));
+
+    const renderLogTable = (days: typeof logDays) => (
+      <table className="w-full text-xs font-mono">
+        <thead>
+          <tr className="border-b border-black text-left">
+            {forPrint && <th className="pb-1 w-1/5">Date</th>}
+            <th className="pb-1 w-1/6">Category</th>
+            <th className="pb-1 w-[45%]">Description</th>
+            <th className="pb-1 text-right w-1/6">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {days.map(({ date, items, spent }) => (
+            <React.Fragment key={date}>
+              {items.map(t => (
+                <tr key={t.id} {...(forPrint ? {} : swipeHandlers<HTMLTableRowElement>(`history-${t.id}`))}>
+                  {forPrint && <td className="py-1">{date}</td>}
+                  <td className="py-1">{t.category || 'General'}</td>
+                  <td className="py-1">{t.description}</td>
+                  {renderTransactionAmount(t, `${t.amount > 0 ? '+' : '-'}Rs. ${Math.abs(t.amount).toLocaleString()}`)}
+                </tr>
+              ))}
+              {forPrint && (
+                <tr className="print-statement-subtotal">
+                  <td className="py-2" colSpan={3}>Daily Total Spent - {date}</td>
+                  <td className="py-2 text-right">Rs. {spent.toLocaleString()}</td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    );
+
     const printCycleSummary = cycles
       .map((cycle, index) => {
         const nextCycleStart = cycles[index - 1]?.start_date;
@@ -1814,51 +1860,16 @@ export default function Dashboard() {
         )}
 
         {renderSection("Transaction Log", <>
-          {printDetailedDates.length === 0 ? (
+          {logDays.length === 0 ? (
             <p className="text-xs italic text-gray-500 text-center py-4">No transactions recorded for this period.</p>
-          ) : (
-            <table className="w-full text-xs font-mono">
-              <thead>
-                <tr className="border-b border-black text-left">
-                  <th className="pb-1 w-1/5">Date</th>
-                  <th className="pb-1 w-1/6">Category</th>
-                  <th className="pb-1 w-[45%]">Description</th>
-                  <th className="pb-1 text-right w-1/6">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {printDetailedDates.map(date => {
-                  const dateTransactions = printLogTransactions
-                    .filter(t => t.date === date)
-                    .sort((a, b) => b.created_at.localeCompare(a.created_at));
-                  const dailySpent = dateTransactions
-                    .filter(t =>
-                      t.type === 'expense' &&
-                      t.category !== 'Savings Sweep' &&
-                      t.category !== 'Debt' &&
-                      t.category !== 'Debt Settlement'
-                    )
-                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-                  return (
-                    <React.Fragment key={date}>
-                      {dateTransactions.map(t => (
-                        <tr key={t.id} {...forPrint ? {} : swipeHandlers<HTMLTableRowElement>(`history-${t.id}`)}>
-                          <td className="py-1">{t.date}</td>
-                          <td className="py-1">{t.category || 'General'}</td>
-                          <td className="py-1">{t.description}</td>
-                          {renderTransactionAmount(t, `${t.amount > 0 ? '+' : '-'}Rs. ${Math.abs(t.amount).toLocaleString()}`)}
-                        </tr>
-                      ))}
-                      <tr className="print-statement-subtotal">
-                        <td className="py-2" colSpan={3}>Daily Total Spent - {date}</td>
-                        <td className="py-2 text-right">Rs. {dailySpent.toLocaleString()}</td>
-                      </tr>
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+          ) : forPrint ? renderLogTable(logDays) : (
+            <div className="history-statement-log-days">
+              {logDays.map(day => (
+                <React.Fragment key={day.date}>
+                  {renderSection(`${day.date} ? Rs. ${day.spent.toLocaleString()} spent`, renderLogTable([day]))}
+                </React.Fragment>
+              ))}
+            </div>
           )}
         </>)}
 

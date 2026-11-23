@@ -262,7 +262,7 @@ body {
   display: none;
 }
 
-.history-statement-details[open] summary svg {
+.history-statement-details[open] > summary svg {
   transform: rotate(180deg);
 }
 
@@ -275,6 +275,15 @@ body {
   padding: 0.5rem 0.75rem 0.75rem;
   border-top: 1px solid var(--border-color);
   overflow-x: auto;
+}
+
+.history-statement-log-days {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.history-statement table {
+  font-size: 0.6875rem;
 }
 
 .history-statement :is(th, td) {

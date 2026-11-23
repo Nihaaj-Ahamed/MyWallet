@@ -864,26 +864,22 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveStateToLocal(updatedCycles, updatedTransactions, debts, updatedSavings);
   };
 
-  // Update active cycle's base income and set Hand Money equal to it
+  // Update the active cycle budget.
   const updateActiveCycleIncome = async (amount: number) => {
     if (!activeCycle) return;
 
     const updatedCycles = cycles.map(c => c.id === activeCycle.id ? { ...c, income: amount } : c);
     setCycles(updatedCycles);
 
-    const updatedSavings = savings.map(s => s.id === 'wallet-hand' ? { ...s, current_balance: amount } : s);
-    setSavings(updatedSavings);
-
     if (isSupabaseConfigured() && supabase && userId) {
       try {
         await client.from('cycles').update({ income: amount } as any).eq('id', activeCycle.id).eq('user_id', userId);
-        await client.from('savings_vault').update({ current_balance: amount } as any).eq('id', 'wallet-hand').eq('user_id', userId);
       } catch (err) {
         console.error("Failed to update active cycle income in Supabase:", err);
       }
     }
 
-    saveStateToLocal(updatedCycles, transactions, debts, updatedSavings);
+    saveStateToLocal(updatedCycles, transactions, debts, savings);
   };
 
   // Edit/Adjust a transaction
