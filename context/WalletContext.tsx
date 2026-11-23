@@ -292,58 +292,46 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Log expense (deducts from Hand Money by default, or Bank Money if specified)
   const addExpense = async (amount: number, description: string, category: string, date: string, source: 'hand' | 'bank' = 'hand', countInDayCycle = false) => {
+    if (!Number.isFinite(amount) || amount === 0) throw new Error('Enter a valid expense amount.');
+
     const isBank = source === 'bank';
     const walletId = isBank ? 'wallet-bank' : 'wallet-hand';
     const expenseAmount = Math.abs(amount);
-    const currentWalletObj = savings.find(s => s.id === walletId);
-    const newWalletBalance = (currentWalletObj ? currentWalletObj.current_balance : 0) - expenseAmount;
-
-    const walletExists = savings.some(s => s.id === walletId);
-    const updatedSavings = walletExists
-      ? savings.map(s => s.id === walletId ? { ...s, current_balance: newWalletBalance } : s)
-      : [
-          ...savings,
-          {
-            id: walletId,
-            user_id: userId,
-            name: isBank ? 'Bank Money' : 'Hand Money',
-            current_balance: newWalletBalance,
-            target_goal: 0,
-            created_at: new Date().toISOString(),
-          },
-        ];
-    setSavings(updatedSavings);
-
+    const wallet = savings.find(item => item.id === walletId);
+    const createdAt = new Date().toISOString();
     const newTransaction: Transaction = {
-      id: crypto.randomUUID(), user_id: userId,
+      id: crypto.randomUUID(),
+      user_id: userId,
       cycle_id: activeCycle ? activeCycle.id : 'no-active-cycle',
-      amount: -expenseAmount, // Negative for expense
+      amount: -expenseAmount,
       type: 'expense',
-      category: category as any,
-      description: `[${source === 'bank' ? 'Bank' : 'Hand'}]${countInDayCycle ? ' [DayCycle]' : ''} ${description}`,
+      category: category as Transaction['category'],
+      description: `[${isBank ? 'Bank' : 'Hand'}]${countInDayCycle ? ' [DayCycle]' : ''} ${description}`,
       date,
-      created_at: new Date().toISOString(),
+      created_at: createdAt,
     };
 
-    const updatedTransactions = [newTransaction, ...transactions];
-    setTransactions(updatedTransactions);
+    let newWalletBalance = (wallet?.current_balance ?? 0) - expenseAmount;
+    if (supabase) {
+      if (!userId) throw new Error('Sign in before recording expenses.');
+      const { data, error } = await supabase.rpc('record_wallet_expense', { expense_data: newTransaction });
+      if (error) throw new Error(error.message);
+      newWalletBalance = data;
+    }
 
-    if (isSupabaseConfigured() && supabase && userId) {
-      try {
-        await client.from('savings_vault').upsert({
+    const updatedSavings = wallet
+      ? savings.map(item => item.id === walletId ? { ...item, current_balance: newWalletBalance } : item)
+      : [...savings, {
           id: walletId,
           user_id: userId,
           name: isBank ? 'Bank Money' : 'Hand Money',
           current_balance: newWalletBalance,
           target_goal: 0,
-          created_at: currentWalletObj?.created_at || new Date().toISOString(),
-        } as any);
-        await client.from('transactions').insert(newTransaction as any);
-      } catch (err) {
-        console.error("Supabase insert expense error:", err);
-      }
-    }
-
+          created_at: createdAt,
+        }];
+    const updatedTransactions = [newTransaction, ...transactions];
+    setSavings(updatedSavings);
+    setTransactions(updatedTransactions);
     saveStateToLocal(cycles, updatedTransactions, debts, updatedSavings);
   };
 

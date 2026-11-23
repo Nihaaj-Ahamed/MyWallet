@@ -20,6 +20,7 @@ import { useWallet } from '../context/WalletContext';
 
 export default function FABModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'expense' | 'income' | 'withdrawal' | 'debt' | 'adjustment'>('expense');
   
   const { 
@@ -85,6 +86,8 @@ export default function FABModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       if (activeTab === 'expense') {
@@ -124,6 +127,9 @@ export default function FABModal() {
       resetForm();
     } catch (err) {
       console.error("Error submitting form: ", err);
+      alert(err instanceof Error ? err.message : 'Unable to save this entry.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -602,10 +608,11 @@ export default function FABModal() {
                   </button>
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="flex-1 flex items-center justify-center gap-1.5 rounded-full bg-black dark:bg-[#4DB6AC] py-3 text-sm font-extrabold text-white dark:text-[#0F1916] transition-all duration-300 active:scale-95 min-h-[44px] cursor-pointer shadow-sm"
                   >
                     <Check className="h-4 w-4 stroke-[2.5]" />
-                    <span>Post Ledger</span>
+                    <span>{isSubmitting ? 'Saving…' : 'Post Ledger'}</span>
                   </button>
                 </div>
               </form>

@@ -2,6 +2,7 @@ export interface Database {
   public: {
     Tables: {
       cycles: {
+        Relationships: [];
         Row: {
           id: string;
           user_id: string | null;
@@ -31,6 +32,7 @@ export interface Database {
         };
       };
       transactions: {
+        Relationships: [];
         Row: {
           id: string;
           user_id: string | null;
@@ -66,6 +68,7 @@ export interface Database {
         };
       };
       debts: {
+        Relationships: [];
         Row: {
           id: string;
           user_id: string | null;
@@ -95,6 +98,7 @@ export interface Database {
         };
       };
       savings_vault: {
+        Relationships: [];
         Row: {
           id: string;
           user_id: string | null;
@@ -121,8 +125,10 @@ export interface Database {
         };
       };
     };
+    Views: Record<string, never>;
     Functions: {
       reset_wallet_data: { Args: never; Returns: undefined };
+      record_wallet_expense: { Args: { expense_data: Transaction }; Returns: number };
     };
   };
 }

@@ -204,6 +204,165 @@ body {
   transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
+.history-statement {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-statement .print-statement-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  background: #182544;
+  color: white;
+  padding: 1rem;
+}
+
+.history-statement h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.history-statement .print-statement-total strong {
+  display: block;
+  color: #f5cd8e;
+  font-size: 1.125rem;
+}
+
+.history-statement-summary {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.history-statement-details {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+}
+
+.history-statement-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.history-statement-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.history-statement-details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.history-statement-summary .history-statement-detail-body > div {
+  gap: 0.5rem;
+  padding-block: 0.2rem;
+}
+
+.history-statement-detail-body {
+  padding: 0.5rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.history-statement :is(th, td) {
+  border-bottom: 1px solid var(--border-color);
+  padding: 0.4rem 0.25rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.history-statement td:last-child {
+  white-space: nowrap;
+}
+
+.history-statement .print-statement-subtotal {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  font-weight: 700;
+}
+
+.history-statement .print-statement-cycle {
+  padding: 0.4rem 0.65rem;
+  border-left: 2px solid #a77332;
+  margin-top: 0.5rem;
+}
+
+[data-swipe-row],
+tr[data-swipe-row] > td {
+  touch-action: pan-y pinch-zoom;
+}
+
+.swipe-actions {
+  --swipe-width: 44px;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.swipe-actions-pair {
+  --swipe-width: 88px;
+}
+
+.swipe-actions-content {
+  display: grid;
+  align-content: center;
+  min-height: 44px;
+  transition: transform 150ms ease-out;
+}
+
+.swipe-actions-rail {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: flex;
+  align-items: center;
+  background: var(--card-bg-light);
+  transform: translateX(100%);
+  transition: transform 150ms ease-out;
+}
+
+.swipe-actions[data-open="true"] > .swipe-actions-content {
+  transform: translateX(calc(-1 * var(--swipe-width)));
+}
+
+.swipe-actions[data-open="true"] > .swipe-actions-rail {
+  transform: translateX(0);
+}
+
+.swipe-actions-rail button {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.swipe-actions-rail .swipe-actions-delete {
+  color: #e11d48;
+}
+
+.swipe-amount {
+  min-width: var(--swipe-width);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-actions-content,
+  .swipe-actions-rail {
+    transition: none;
+  }
+}
+
 /* Print layout tweaks for PDF export */
 @media print {
   body {
@@ -280,13 +439,13 @@ body {
     break-inside: avoid;
   }
 
-  .print-statement-summary > div {
+  .print-statement-summary > section {
     border-top: 2pt solid var(--statement-accent);
     background: var(--statement-tint);
     padding: 8pt 10pt;
   }
 
-  .print-statement-summary > div > div {
+  .print-statement-summary > section > div {
     gap: 6pt;
     padding: 2pt 0;
     font: inherit;

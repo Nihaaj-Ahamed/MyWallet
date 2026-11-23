@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '../context/WalletContext';
 import FABModal from '../components/FABModal';
@@ -205,8 +205,6 @@ export default function Dashboard() {
   const [editingQuickIndex, setEditingQuickIndex] = useState<number | null>(null);
   const [editQuickAmount, setEditQuickAmount] = useState('');
   const [editQuickDescription, setEditQuickDescription] = useState('');
-  const [revealedQuickIndex, setRevealedQuickIndex] = useState<number | null>(null);
-  const [quickSwipeStartX, setQuickSwipeStartX] = useState<number | null>(null);
   const [quickDeductionLedger, setQuickDeductionLedger] = useState<QuickCycleDeduction[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -279,7 +277,9 @@ export default function Dashboard() {
   }, []);
 
   // Statement PDF printing state
-  const [printStatementMonth, setPrintStatementMonth] = useState<string | null>(null);
+  const [printStatementMonth, setPrintStatementMonth] = useState<{ name: string; prefix: string } | null>(null);
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
+  const swipeStart = useRef<{ pointerId: number; rowId: string; x: number; y: number } | null>(null);
 
   // 4 Wallets Edit Mode state
   const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
@@ -294,9 +294,6 @@ export default function Dashboard() {
   const toggleCycleDate = (date: string) => {
     setExpandedCycleDates(prev => ({ ...prev, [date]: !prev[date] }));
   };
-
-  // Expanded monthly date timeline accordion state
-  const [expandedMonthlyDates, setExpandedMonthlyDates] = useState<{ [key: string]: boolean }>({});
 
   // Binary theme switcher state ('light' | 'dark')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -337,21 +334,6 @@ export default function Dashboard() {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  };
-
-  // Helper to convert Month Year label (e.g. "June 2026") to prefix "2026-06"
-  const getPrefixFromMonthLabel = (label: string) => {
-    const parts = label.split(' ');
-    if (parts.length !== 2) return '';
-    const [monthName, yearStr] = parts;
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    const monthIndex = monthNames.indexOf(monthName);
-    if (monthIndex === -1) return '';
-    const monthStr = String(monthIndex + 1).padStart(2, '0');
-    return `${yearStr}-${monthStr}`;
   };
 
   const handleDeleteTransaction = async (id: string) => {
@@ -563,7 +545,6 @@ export default function Dashboard() {
     if (!confirm("Delete this Day Cycle deduction?")) return;
     setQuickDeductionLedger(prev => prev.filter((_, itemIndex) => itemIndex !== index));
     setEditingQuickIndex(null);
-    setRevealedQuickIndex(null);
   };
 
   const handleResetDayCounter = () => {
@@ -750,7 +731,12 @@ export default function Dashboard() {
     const description = `Fixed Outflow: ${outflow.title}`;
     const date = getLocalDateString();
     
-    await addExpense(amount, description, category, date, outflowSource);
+    try {
+      await addExpense(amount, description, category, date, outflowSource);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to save this payment.');
+      return;
+    }
     
     setOutflows(prev => prev.map(o => {
       if (o.id === outflow.id) {
@@ -849,116 +835,13 @@ export default function Dashboard() {
   };
 
   // Printing triggers
-  const handlePrintMonthlyStatement = (monthName: string) => {
-    setPrintStatementMonth(monthName);
+  const handlePrintMonthlyStatement = (monthName: string, monthPrefix: string) => {
+    setPrintStatementMonth({ name: monthName, prefix: monthPrefix });
     setTimeout(() => {
       if (typeof window !== 'undefined') {
         window.print();
       }
     }, 100);
-  };
-
-  // Swiped transaction state in Monthly History
-  const [swipedTransactionId, setSwipedTransactionId] = useState<string | null>(null);
-  const [itemTouchStart, setItemTouchStart] = useState<number | null>(null);
-
-  const handleItemTouchStart = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    setItemTouchStart(e.touches[0].clientX);
-  };
-
-  const handleItemTouchMove = (e: React.TouchEvent, id: string) => {
-    e.stopPropagation();
-    if (itemTouchStart === null) return;
-    const currentX = e.touches[0].clientX;
-    const diffX = itemTouchStart - currentX;
-    
-    // Swipe left to open edit options
-    if (diffX > 45) {
-      setSwipedTransactionId(id);
-    }
-    // Swipe right to close/hide edit options
-    if (diffX < -45) {
-      if (swipedTransactionId === id) {
-        setSwipedTransactionId(null);
-      }
-    }
-  };
-
-  const handleItemTouchEnd = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    setItemTouchStart(null);
-  };
-
-  const handleItemMouseDown = (e: React.MouseEvent) => {
-    setItemTouchStart(e.clientX);
-  };
-
-  const handleItemMouseMove = (e: React.MouseEvent, id: string) => {
-    if (itemTouchStart === null) return;
-    const diffX = itemTouchStart - e.clientX;
-    if (diffX > 45) {
-      setSwipedTransactionId(id);
-    } else if (diffX < -45) {
-      if (swipedTransactionId === id) {
-        setSwipedTransactionId(null);
-      }
-    }
-  };
-
-  const handleItemMouseUp = () => {
-    setItemTouchStart(null);
-  };
-
-  // Swiped debt state in Trust Ledger
-  const [swipedDebtId, setSwipedDebtId] = useState<string | null>(null);
-
-  const handleDebtTouchStart = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    setItemTouchStart(e.touches[0].clientX);
-  };
-
-  const handleDebtTouchMove = (e: React.TouchEvent, id: string) => {
-    e.stopPropagation();
-    if (itemTouchStart === null) return;
-    const currentX = e.touches[0].clientX;
-    const diffX = itemTouchStart - currentX;
-    
-    // Swipe left to open edit options
-    if (diffX > 45) {
-      setSwipedDebtId(id);
-    }
-    // Swipe right to close/hide edit options
-    if (diffX < -45) {
-      if (swipedDebtId === id) {
-        setSwipedDebtId(null);
-      }
-    }
-  };
-
-  const handleDebtTouchEnd = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    setItemTouchStart(null);
-  };
-
-  const handleDebtMouseDown = (e: React.MouseEvent) => {
-    setItemTouchStart(e.clientX);
-  };
-
-  const handleDebtMouseMove = (e: React.MouseEvent, id: string) => {
-    if (itemTouchStart === null) return;
-    const diffX = itemTouchStart - e.clientX;
-    if (diffX > 45) {
-      setSwipedDebtId(id);
-    } else if (diffX < -45) {
-      if (swipedDebtId === id) {
-        setSwipedDebtId(null);
-      }
-    }
-  };
-
-  const handleDebtMouseUp = () => {
-    setItemTouchStart(null);
   };
 
   if (loading) {
@@ -1086,21 +969,17 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-1">
+              renderSwipeActions('balance-wallet-bank', (
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
                   className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {bankMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <button 
-                  type="button"
-                  onClick={() => handleStartEditWallet('wallet-bank', bankMoney)}
-                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-95 cursor-pointer"
-                >
-                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
-                </button>
-              </div>
+              ), {
+                label: 'Bank Money',
+                edit: () => handleStartEditWallet('wallet-bank', bankMoney),
+              }, { className: 'rounded-lg' })
             )}
             <div className="flex justify-between items-center mt-1">
               <p className="text-[9px] text-sage/85 leading-tight">Auto-updates on Incomes & Bank Expenses</p>
@@ -1134,21 +1013,17 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-1">
+              renderSwipeActions('balance-wallet-hand', (
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-hand', handMoney)}
                   className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {handMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <button 
-                  type="button"
-                  onClick={() => handleStartEditWallet('wallet-hand', handMoney)}
-                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-95 cursor-pointer"
-                >
-                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
-                </button>
-              </div>
+              ), {
+                label: 'Hand Money',
+                edit: () => handleStartEditWallet('wallet-hand', handMoney),
+              }, { className: 'rounded-lg' })
             )}
             <div className="flex justify-between items-center mt-1">
               <p className="text-[9px] text-sage/85 leading-tight">Primary cash wallet for daily hand expenses</p>
@@ -1182,21 +1057,17 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-1">
+              renderSwipeActions('balance-wallet-savings', (
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
                   className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {savingMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <button 
-                  type="button"
-                  onClick={() => handleStartEditWallet('wallet-savings', savingMoney)}
-                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
-                >
-                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
-                </button>
-              </div>
+              ), {
+                label: 'savings balance',
+                edit: () => handleStartEditWallet('wallet-savings', savingMoney),
+              }, { className: 'rounded-lg' })
             )}
             <p className="text-[9px] text-sage/85 mt-1 leading-tight">Accumulated vaults swept from cycles</p>
           </div>
@@ -1240,21 +1111,17 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-baseline justify-between mt-1">
+              renderSwipeActions('balance-wallet-option', (
                 <h3 
                   onDoubleClick={() => handleStartEditWallet('wallet-option', optionMoney)}
                   className={`text-lg md:text-xl font-sans font-black text-charcoal tracking-tight cursor-pointer transition-colors ${isBlurred ? 'privacy-blur' : ''}`}
                 >
                   Rs. {optionMoney.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <button 
-                  type="button"
-                  onClick={() => handleStartEditWallet('wallet-option', optionMoney)}
-                  className="p-1.5 text-sage hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-full transition-colors flex items-center justify-center active:scale-90 cursor-pointer"
-                >
-                  <Pencil className="h-3 w-3" strokeWidth={1.75} />
-                </button>
-              </div>
+              ), {
+                label: 'Option Money',
+                edit: () => handleStartEditWallet('wallet-option', optionMoney),
+              }, { className: 'rounded-lg' })
             )}
             <p className="text-[9px] text-sage/85 mt-1 leading-tight">Independent steerable ledger balance</p>
           </div>
@@ -1652,265 +1519,356 @@ export default function Dashboard() {
       </AnimatePresence>
 
 
-      {/* PRINT-ONLY BANK STATEMENT LAYOUT */}
-      {printStatementMonth && (() => {
-        const printPrefix = getPrefixFromMonthLabel(printStatementMonth);
-        const printTransactions = transactions.filter(t => t.date && t.date.startsWith(printPrefix));
-        const printRegularTransactions = printTransactions.filter(
-          t => !t.description.includes('[DayCycle]')
-        );
-        const printDayCycleTransactions = printTransactions.filter(countsTowardCycleSpending);
-        const printCycleDeductions = quickDeductionLedger.filter(
-          item => item.date.startsWith(printPrefix)
-        );
-        
-        const printIncome = printTransactions
-          .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
-          .reduce((sum, t) => sum + t.amount, 0);
-
-        const printExpenses = printRegularTransactions
-          .filter(t => t.type === 'expense' && !isFixedOutflowExpense(t) && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-        const printSweeps = printRegularTransactions
-          .filter(t => t.category === 'Savings Sweep')
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-        const foodExpenses = printRegularTransactions
-          .filter(t => t.type === 'expense' && t.category === 'Food')
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-        const travelExpenses = printRegularTransactions
-          .filter(t => t.type === 'expense' && t.category.includes('Travel'))
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-        const rentUtilityExpenses = printRegularTransactions
-          .filter(t => t.type === 'expense' && ['Rent', 'Electricity'].includes(t.category))
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-        const generalExpenses = printRegularTransactions
-          .filter(t => t.type === 'expense' && t.category === 'General')
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-        const printCycleTransactionSpent = printDayCycleTransactions
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-        const printQuickCycleDeduction = printCycleDeductions
-          .reduce((sum, item) => sum + item.amount, 0);
-        const printTotalCycleDeductions = printCycleTransactionSpent + printQuickCycleDeduction;
-        const printLogTransactions = printRegularTransactions.filter(t => !isFixedOutflowExpense(t));
-        const printDetailedDates = Array.from(new Set(
-          printLogTransactions.map(t => t.date)
-        )).sort((a, b) => b.localeCompare(a));
-        const printCycleSummary = cycles
-          .map((cycle, index) => {
-            const nextCycleStart = cycles[index - 1]?.start_date;
-            const endDate = nextCycleStart && nextCycleStart < cycle.end_date
-              ? nextCycleStart
-              : cycle.end_date;
-            return { cycle, endDate };
-          })
-          .filter(({ cycle, endDate }) =>
-            endDate >= `${printPrefix}-01` &&
-            cycle.start_date <= `${printPrefix}-31`
-          )
-          .reverse()
-          .map(({ cycle, endDate }) => {
-            const dailySpent = new Map<string, number>();
-            const cycleRegularExpenses = transactions.filter(t =>
-              t.cycle_id === cycle.id &&
-              t.date >= cycle.start_date &&
-              t.date <= endDate &&
-              t.type === 'expense' &&
-              !t.description.includes('[DayCycle]') &&
-              t.category !== 'Savings Sweep' &&
-              t.category !== 'Debt' &&
-              t.category !== 'Debt Settlement'
-            );
-            for (const transaction of cycleRegularExpenses) {
-              dailySpent.set(transaction.date,
-                (dailySpent.get(transaction.date) ?? 0) + Math.abs(transaction.amount));
-            }
-            const dailyTotals = [...dailySpent.entries()]
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([, amount]) => amount);
-            const total = dailyTotals.reduce((sum, amount) => sum + amount, 0);
-
-            return { cycle, endDate, dailyTotals, total };
-          })
-          .filter(({ cycle, total }) => cycle.id === activeCycle?.id || total > 0);
-
-        return (
-          <div className="print-statement hidden print:block">
-            <header className="print-statement-header">
-              <div>
-                <p>Vault</p>
-                <h1>Monthly Statement</h1>
-                <time dateTime={printPrefix}>{printStatementMonth}</time>
-              </div>
-              <div className="print-statement-total">
-                <span>Net Ledger Balance</span>
-                <strong>Rs. {(printIncome - printExpenses - printCycleTransactionSpent - printSweeps).toLocaleString()}</strong>
-              </div>
-            </header>
-
-            <div className="print-statement-summary grid grid-cols-2 gap-4">
-              <div>
-                <h2>Monthly Summary</h2>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>Opening Inflows:</span>
-                  <span>Rs. {printIncome.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>Period Expenses Logged:</span>
-                  <span>Rs. {printExpenses.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>Day Cycle Deductions:</span>
-                  <span>Rs. {printTotalCycleDeductions.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>Deposited to Savings:</span>
-                  <span>Rs. {printSweeps.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div>
-                <h2>Spending by Category</h2>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>Food & Groceries:</span>
-                  <span>Rs. {foodExpenses.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>Commutes & Highway:</span>
-                  <span>Rs. {travelExpenses.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>Rent & Utility Bills:</span>
-                  <span>Rs. {rentUtilityExpenses.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs font-mono">
-                  <span>General & Other:</span>
-                  <span>Rs. {generalExpenses.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            <section>
-              <h2>Day Cycle Deductions</h2>
-              {printDayCycleTransactions.length === 0 && printCycleDeductions.length === 0 ? (
-                <p className="text-xs italic text-gray-500 text-center py-2">No Day Cycle deductions recorded for this period.</p>
-              ) : (
-                <table className="w-full text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-black text-left">
-                      <th className="pb-1 w-1/4">Date</th>
-                      <th className="pb-1 w-1/2">Description</th>
-                      <th className="pb-1 text-right w-1/4">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printDayCycleTransactions.map(t => (
-                      <tr key={t.id}>
-                        <td className="py-1">{t.date}</td>
-                        <td className="py-1">{t.description.replace('[Bank]', '').replace('[Hand]', '').replace('[Option]', '').replace('[DayCycle]', '').trim()}</td>
-                        <td className="py-1 text-right">-Rs. {Math.abs(t.amount).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                    {printCycleDeductions.map((item, index) => (
-                      <tr key={`cycle-deduction-${index}`}>
-                        <td className="py-1">{item.date}</td>
-                        <td className="py-1">{item.description || (item.mode === 'custom' ? 'Custom remaining deduction' : 'Quick remaining deduction')}</td>
-                        <td className="py-1 text-right">-Rs. {item.amount.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                    <tr className="print-statement-subtotal">
-                      <th scope="row" colSpan={2} className="text-left">Total Day Cycle Deductions</th>
-                      <td className="text-right">-Rs. {printTotalCycleDeductions.toLocaleString()}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-            </section>
-
-            {printCycleSummary.length > 0 && (
-              <section>
-                <h2>Cycle Daily Spending</h2>
-                {printCycleSummary.map(({ cycle, endDate, dailyTotals, total }) => (
-                  <div key={cycle.id} className="print-statement-cycle">
-                    <p className="font-bold">
-                      {cycle.start_date.replaceAll('-', '.')}
-                      {cycle.id !== activeCycle?.id && ` - ${endDate.replaceAll('-', '.')}`}
-                    </p>
-                    <p className="break-words">
-                      {dailyTotals.map(amount => amount.toLocaleString()).join(' + ') || '0'} = <strong>{total.toLocaleString()}</strong>
-                    </p>
-                  </div>
-                ))}
-              </section>
-            )}
-
-            <section>
-              <h2>Transaction Log</h2>
-              {printDetailedDates.length === 0 ? (
-                <p className="text-xs italic text-gray-500 text-center py-4">No transactions recorded for this period.</p>
-              ) : (
-                <table className="w-full text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-black text-left">
-                      <th className="pb-1 w-1/5">Date</th>
-                      <th className="pb-1 w-1/6">Category</th>
-                      <th className="pb-1 w-[45%]">Description</th>
-                      <th className="pb-1 text-right w-1/6">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printDetailedDates.map(date => {
-                      const dateTransactions = printLogTransactions
-                        .filter(t => t.date === date)
-                        .sort((a, b) => b.created_at.localeCompare(a.created_at));
-                      const dailySpent = dateTransactions
-                        .filter(t =>
-                          t.type === 'expense' &&
-                          t.category !== 'Savings Sweep' &&
-                          t.category !== 'Debt' &&
-                          t.category !== 'Debt Settlement'
-                        )
-                        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-                      return (
-                        <React.Fragment key={date}>
-                          {dateTransactions.map(t => (
-                            <tr
-                              key={t.id}
-                            >
-                              <td className="py-1">{t.date}</td>
-                              <td className="py-1">{t.category || 'General'}</td>
-                              <td className="py-1">{t.description}</td>
-                              <td className="py-1 text-right">{t.amount > 0 ? '+' : '-'}Rs. {Math.abs(t.amount).toLocaleString()}</td>
-                            </tr>
-                          ))}
-                          <tr className="print-statement-subtotal">
-                            <td className="py-2" colSpan={3}>Daily Total Spent - {date}</td>
-                            <td className="py-2 text-right">Rs. {dailySpent.toLocaleString()}</td>
-                          </tr>
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </section>
-
-            <footer className="print-statement-footer">
-              <span>Security ID Reference: VAULT-OFFICIAL-{printStatementMonth.replace(' ', '-').toUpperCase()}</span>
-              <span>Ledger Officer Sign: __________________________</span>
-            </footer>
-          </div>
-        );
-      })()}
+      {printStatementMonth && renderMonthlyStatement(printStatementMonth.name, printStatementMonth.prefix, true)}
 
     </main>
   );
+
+  function swipeHandlers<Element extends HTMLElement>(rowId: string): React.HTMLAttributes<Element> & { 'data-swipe-row': string } {
+    return {
+      'data-swipe-row': '',
+      tabIndex: 0,
+      title: 'Swipe left or press Enter for actions',
+      onPointerDown: event => {
+        if (!event.isPrimary || event.button !== 0) return;
+        if (event.target instanceof window.Element && event.target.closest('button, input, select, textarea, a')) return;
+        swipeStart.current = { pointerId: event.pointerId, rowId, x: event.clientX, y: event.clientY };
+      },
+      onPointerUp: event => {
+        const start = swipeStart.current;
+        swipeStart.current = null;
+        if (!start || start.pointerId !== event.pointerId || start.rowId !== rowId) return;
+        const distance = event.clientX - start.x;
+        if (Math.abs(distance) < 32 || Math.abs(distance) <= Math.abs(event.clientY - start.y)) return;
+        setOpenSwipeId(previous => distance < 0 ? rowId : previous === rowId ? null : previous);
+      },
+      onPointerCancel: () => { swipeStart.current = null; },
+      onKeyDown: event => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Escape') return;
+        event.preventDefault();
+        setOpenSwipeId(previous => previous === rowId || event.key === 'Escape' ? null : rowId);
+      },
+    };
+  }
+
+  function renderSwipeActions(
+    rowId: string,
+    content: React.ReactNode,
+    actions: { label: string; edit?: () => void; remove?: () => void },
+    options: { className?: string; handleGestures?: boolean } = {},
+  ) {
+    const { edit, remove, label } = actions;
+    const isOpen = openSwipeId === rowId;
+    const run = (action: () => void) => {
+      setOpenSwipeId(null);
+      action();
+    };
+
+    return (
+      <div
+        key={rowId}
+        className={`swipe-actions ${edit && remove ? 'swipe-actions-pair' : ''} ${options.className ?? ''}`}
+        data-open={isOpen}
+        {...(options.handleGestures === false ? {} : swipeHandlers<HTMLDivElement>(rowId))}
+      >
+        <div className="swipe-actions-content">{content}</div>
+        <div className="swipe-actions-rail" inert={!isOpen}>
+          {edit && (
+            <button type="button" aria-label={`Edit ${label}`} onClick={() => run(edit)}>
+              <Pencil className="size-4" />
+            </button>
+          )}
+          {remove && (
+            <button type="button" className="swipe-actions-delete" aria-label={`Delete ${label}`} onClick={() => run(remove)}>
+              <Trash2 className="size-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function transactionActions(transaction: Transaction) {
+    return {
+      label: 'transaction',
+      edit: () => handleStartEditTransaction(transaction),
+      remove: () => handleDeleteTransaction(transaction.id),
+    };
+  }
+
+  function renderMonthlyStatement(monthName: string, printPrefix: string, forPrint = false) {
+    const renderSection = (title: string, content: React.ReactNode) => forPrint ? (
+      <section>
+        <h2>{title}</h2>
+        {content}
+      </section>
+    ) : (
+      <details className="history-statement-details">
+        <summary>{title}<ChevronDown className="size-4 shrink-0" aria-hidden="true" /></summary>
+        <div className="history-statement-detail-body">{content}</div>
+      </details>
+    );
+
+    const renderTransactionAmount = (transaction: Transaction, amount: string, editable = true) => {
+      const rowId = `history-${transaction.id}`;
+      return (
+        <td className="py-1 text-right">
+          {forPrint || !editable ? amount : renderSwipeActions(rowId, amount, transactionActions(transaction), {
+            className: 'swipe-amount',
+            handleGestures: false,
+          })}
+        </td>
+      );
+    };
+    const printTransactions = transactions.filter(t => t.date && t.date.startsWith(printPrefix));
+    const printRegularTransactions = printTransactions.filter(
+      t => !t.description.includes('[DayCycle]')
+    );
+    const printDayCycleTransactions = printTransactions.filter(countsTowardCycleSpending);
+    const printCycleDeductions = quickDeductionLedger.filter(
+      item => item.date.startsWith(printPrefix)
+    );
+
+    const printIncome = printTransactions
+      .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const printExpenses = printRegularTransactions
+      .filter(t => t.type === 'expense' && !isFixedOutflowExpense(t) && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const printSweeps = printRegularTransactions
+      .filter(t => t.category === 'Savings Sweep')
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const foodExpenses = printRegularTransactions
+      .filter(t => t.type === 'expense' && t.category === 'Food')
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const travelExpenses = printRegularTransactions
+      .filter(t => t.type === 'expense' && t.category.includes('Travel'))
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const rentUtilityExpenses = printRegularTransactions
+      .filter(t => t.type === 'expense' && ['Rent', 'Electricity'].includes(t.category))
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const generalExpenses = printRegularTransactions
+      .filter(t => t.type === 'expense' && t.category === 'General')
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const printCycleTransactionSpent = printDayCycleTransactions
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    const printQuickCycleDeduction = printCycleDeductions
+      .reduce((sum, item) => sum + item.amount, 0);
+    const printTotalCycleDeductions = printCycleTransactionSpent + printQuickCycleDeduction;
+    const printLogTransactions = printRegularTransactions.filter(t => !isFixedOutflowExpense(t));
+    const printDetailedDates = Array.from(new Set(
+      printLogTransactions.map(t => t.date)
+    )).sort((a, b) => b.localeCompare(a));
+    const printCycleSummary = cycles
+      .map((cycle, index) => {
+        const nextCycleStart = cycles[index - 1]?.start_date;
+        const endDate = nextCycleStart && nextCycleStart < cycle.end_date
+          ? nextCycleStart
+          : cycle.end_date;
+        return { cycle, endDate };
+      })
+      .filter(({ cycle, endDate }) =>
+        endDate >= `${printPrefix}-01` &&
+        cycle.start_date <= `${printPrefix}-31`
+      )
+      .reverse()
+      .map(({ cycle, endDate }) => {
+        const dailySpent = new Map<string, number>();
+        const cycleRegularExpenses = transactions.filter(t =>
+          t.cycle_id === cycle.id &&
+          t.date >= cycle.start_date &&
+          t.date <= endDate &&
+          t.type === 'expense' &&
+          !countsTowardCycleSpending(t) &&
+          t.category !== 'Savings Sweep' &&
+          t.category !== 'Debt' &&
+          t.category !== 'Debt Settlement'
+        );
+        for (const transaction of cycleRegularExpenses) {
+          dailySpent.set(transaction.date,
+            (dailySpent.get(transaction.date) ?? 0) + Math.abs(transaction.amount));
+        }
+        const dailyTotals = [...dailySpent.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([, amount]) => amount);
+        const total = dailyTotals.reduce((sum, amount) => sum + amount, 0);
+
+        return { cycle, endDate, dailyTotals, total };
+      })
+      .filter(({ cycle, total }) => cycle.id === activeCycle?.id || total > 0);
+
+    return (
+      <div className={forPrint ? "print-statement hidden print:block" : "history-statement"}>
+        <header className="print-statement-header">
+          <div>
+            <p>Vault</p>
+            <h1>Monthly Statement</h1>
+            <time dateTime={printPrefix}>{monthName}</time>
+          </div>
+          <div className="print-statement-total">
+            <span>Net Ledger Balance</span>
+            <strong>Rs. {(printIncome - printExpenses - printCycleTransactionSpent - printSweeps).toLocaleString()}</strong>
+          </div>
+        </header>
+
+        <div className={forPrint ? "print-statement-summary grid grid-cols-2 gap-4" : "history-statement-summary"}>
+          {renderSection("Monthly Summary", <>
+            <div className="flex justify-between text-xs font-mono">
+              <span>Opening Inflows:</span>
+              <span>Rs. {printIncome.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs font-mono">
+              <span>Period Expenses Logged:</span>
+              <span>Rs. {printExpenses.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs font-mono">
+              <span>Day Cycle Deductions:</span>
+              <span>Rs. {printTotalCycleDeductions.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs font-mono">
+              <span>Deposited to Savings:</span>
+              <span>Rs. {printSweeps.toLocaleString()}</span>
+            </div>
+          </>)}
+
+          {renderSection("Spending by Category", <>
+            <div className="flex justify-between text-xs font-mono">
+              <span>Food & Groceries:</span>
+              <span>Rs. {foodExpenses.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs font-mono">
+              <span>Commutes & Highway:</span>
+              <span>Rs. {travelExpenses.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs font-mono">
+              <span>Rent & Utility Bills:</span>
+              <span>Rs. {rentUtilityExpenses.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs font-mono">
+              <span>General & Other:</span>
+              <span>Rs. {generalExpenses.toLocaleString()}</span>
+            </div>
+          </>)}
+        </div>
+
+        {renderSection("Day Cycle Deductions", <>
+          {printDayCycleTransactions.length === 0 && printCycleDeductions.length === 0 ? (
+            <p className="text-xs italic text-gray-500 text-center py-2">No Day Cycle deductions recorded for this period.</p>
+          ) : (
+            <table className="w-full text-xs font-mono">
+              <thead>
+                <tr className="border-b border-black text-left">
+                  <th className="pb-1 w-1/4">Date</th>
+                  <th className="pb-1 w-1/2">Description</th>
+                  <th className="pb-1 text-right w-1/4">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printDayCycleTransactions.map(t => (
+                  <tr key={t.id} {...forPrint || !isFixedOutflowExpense(t) ? {} : swipeHandlers<HTMLTableRowElement>(`history-${t.id}`)}>
+                    <td className="py-1">{t.date}</td>
+                    <td className="py-1">
+                      {t.description.replace('[Bank]', '').replace('[Hand]', '').replace('[Option]', '').replace('[DayCycle]', '').trim()}
+                    </td>
+                    {renderTransactionAmount(t, `-Rs. ${Math.abs(t.amount).toLocaleString()}`, isFixedOutflowExpense(t))}
+                  </tr>
+                ))}
+                {printCycleDeductions.map((item, index) => (
+                  <tr key={`cycle-deduction-${index}`}>
+                    <td className="py-1">{item.date}</td>
+                    <td className="py-1">{item.description || (item.mode === 'custom' ? 'Custom remaining deduction' : 'Quick remaining deduction')}</td>
+                    <td className="py-1 text-right">-Rs. {item.amount.toLocaleString()}</td>
+                  </tr>
+                ))}
+                <tr className="print-statement-subtotal">
+                  <th scope="row" colSpan={2} className="text-left">Total Day Cycle Deductions</th>
+                  <td className="text-right">-Rs. {printTotalCycleDeductions.toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </>)}
+
+        {printCycleSummary.length > 0 && (
+          renderSection("Cycle Daily Spending", <>
+            {printCycleSummary.map(({ cycle, endDate, dailyTotals, total }) => (
+              <div key={cycle.id} className="print-statement-cycle">
+                <p className="font-bold">
+                  {cycle.start_date.replaceAll('-', '.')}
+                  {cycle.id !== activeCycle?.id && ` - ${endDate.replaceAll('-', '.')}`}
+                </p>
+                <p className="break-words">
+                  {dailyTotals.map(amount => amount.toLocaleString()).join(' + ') || '0'} = <strong>{total.toLocaleString()}</strong>
+                </p>
+              </div>
+            ))}
+          </>)
+        )}
+
+        {renderSection("Transaction Log", <>
+          {printDetailedDates.length === 0 ? (
+            <p className="text-xs italic text-gray-500 text-center py-4">No transactions recorded for this period.</p>
+          ) : (
+            <table className="w-full text-xs font-mono">
+              <thead>
+                <tr className="border-b border-black text-left">
+                  <th className="pb-1 w-1/5">Date</th>
+                  <th className="pb-1 w-1/6">Category</th>
+                  <th className="pb-1 w-[45%]">Description</th>
+                  <th className="pb-1 text-right w-1/6">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printDetailedDates.map(date => {
+                  const dateTransactions = printLogTransactions
+                    .filter(t => t.date === date)
+                    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+                  const dailySpent = dateTransactions
+                    .filter(t =>
+                      t.type === 'expense' &&
+                      t.category !== 'Savings Sweep' &&
+                      t.category !== 'Debt' &&
+                      t.category !== 'Debt Settlement'
+                    )
+                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+                  return (
+                    <React.Fragment key={date}>
+                      {dateTransactions.map(t => (
+                        <tr key={t.id} {...forPrint ? {} : swipeHandlers<HTMLTableRowElement>(`history-${t.id}`)}>
+                          <td className="py-1">{t.date}</td>
+                          <td className="py-1">{t.category || 'General'}</td>
+                          <td className="py-1">{t.description}</td>
+                          {renderTransactionAmount(t, `${t.amount > 0 ? '+' : '-'}Rs. ${Math.abs(t.amount).toLocaleString()}`)}
+                        </tr>
+                      ))}
+                      <tr className="print-statement-subtotal">
+                        <td className="py-2" colSpan={3}>Daily Total Spent - {date}</td>
+                        <td className="py-2 text-right">Rs. {dailySpent.toLocaleString()}</td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </>)}
+
+        {forPrint && <footer className="print-statement-footer">
+          <span>Security ID Reference: VAULT-OFFICIAL-{monthName.replace(' ', '-').toUpperCase()}</span>
+          <span>Ledger Officer Sign: __________________________</span>
+        </footer>}
+      </div>
+    );
+  }
 
   // TAB 1 RENDER: THE VAULT & TRUST
   function renderVaultAndTrust() {
@@ -2041,151 +1999,101 @@ export default function Dashboard() {
             ) : (
               debts.map((d) => {
                 const isLent = d.amount > 0;
-                const isSwiped = swipedDebtId === d.id;
-                return (
-                  <div 
-                    key={d.id} 
-                    onTouchStart={handleDebtTouchStart}
-                    onTouchMove={(e) => handleDebtTouchMove(e, d.id)}
-                    onTouchEnd={handleDebtTouchEnd}
-                    onMouseDown={handleDebtMouseDown}
-                    onMouseMove={(e) => handleDebtMouseMove(e, d.id)}
-                    onMouseUp={handleDebtMouseUp}
-                    onMouseLeave={handleDebtMouseUp}
-                    className="relative overflow-hidden rounded-lg border border-slate-border/20 bg-obsidian/30 select-none"
-                  >
-                    {/* Swipe edit/delete buttons underneath */}
-                    <div 
-                      className="absolute right-0 top-0 bottom-0 flex items-center bg-slate-50 dark:bg-[#1B2623] transition-all duration-300 z-10"
-                      style={{
-                        width: isSwiped ? '80px' : '0px',
-                        opacity: isSwiped ? 1 : 0,
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <div className="flex items-center justify-center w-full h-full gap-2 px-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleStartEditDebt(d);
-                            setSwipedDebtId(null);
-                          }}
-                          className="p-1.5 text-sage hover:text-charcoal dark:hover:text-white rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
-                          title="Edit trust ledger"
-                        >
-                          <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleDeleteDebt(d.id);
-                            setSwipedDebtId(null);
-                          }}
-                          className="p-1.5 text-rose-500 hover:text-rose-700 rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
-                          title="Delete trust ledger"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
-                        </button>
-                      </div>
+                return renderSwipeActions(`debt-${d.id}`, (
+                  <div className="p-3 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-charcoal dark:text-[#E0E0E0]">{d.person_name}</span>
+                      <span className={`font-mono text-xs font-semibold ${isLent ? 'text-emerald' : 'text-crimson'}`}>
+                        {isLent ? '+' : '-'}Rs. {Math.abs(d.amount).toLocaleString()}
+                      </span>
                     </div>
 
-                    {/* Main Content card */}
-                    <div 
-                      className="p-3 space-y-1.5 transition-transform duration-300"
-                      style={{
-                        transform: isSwiped ? 'translateX(-80px)' : 'translateX(0px)'
-                      }}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-semibold text-charcoal dark:text-[#E0E0E0]">{d.person_name}</span>
-                        <span className={`font-mono text-xs font-semibold ${isLent ? 'text-emerald' : 'text-crimson'}`}>
-                          {isLent ? '+' : '-'}Rs. {Math.abs(d.amount).toLocaleString()}
-                        </span>
-                      </div>
+                    {d.description && (
+                      <p className="text-[10px] text-slate-muted italic">{d.description}</p>
+                    )}
 
-                      {d.description && (
-                        <p className="text-[10px] text-slate-muted italic">{d.description}</p>
+                    <div className="flex justify-between items-center text-[9px]">
+                      <span className={isLent ? 'text-emerald' : 'text-crimson'}>
+                        {isLent ? 'Lent (Receivable)' : 'Borrowed (Payable)'}
+                      </span>
+
+                      {settlingDebtId !== d.id && (
+                        <button
+                          onClick={() => {
+                            setSettlingDebtId(d.id);
+                            setSettleAmount(Math.abs(d.amount).toString());
+                            setSettleSource('hand');
+                          }}
+                          className="text-[9px] uppercase font-bold text-champagne active:underline transition-all min-h-[44px] px-3.5 flex items-center justify-center active:scale-95"
+                        >
+                          Settle
+                        </button>
                       )}
+                    </div>
 
-                      <div className="flex justify-between items-center text-[9px]">
-                        <span className={isLent ? 'text-emerald' : 'text-crimson'}>
-                          {isLent ? 'Lent (Receivable)' : 'Borrowed (Payable)'}
-                        </span>
-                        
-                        {settlingDebtId !== d.id && (
-                          <button
-                            onClick={() => {
-                              setSettlingDebtId(d.id);
-                              setSettleAmount(Math.abs(d.amount).toString());
-                              setSettleSource('hand');
-                            }}
-                            className="text-[9px] uppercase font-bold text-champagne active:underline transition-all min-h-[44px] px-3.5 flex items-center justify-center active:scale-95"
-                          >
-                            Settle
-                          </button>
-                        )}
-                      </div>
-
-                      {settlingDebtId === d.id && (
-                        <div className="mt-2 p-2 bg-obsidian/60 rounded border border-slate-border/30 space-y-2" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-2">
-                            <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Settle Amount</label>
-                            <input
-                              type="number"
-                              placeholder="Amount"
-                              value={settleAmount}
-                              onChange={(e) => setSettleAmount(e.target.value)}
-                              className="w-24 bg-slate-50 dark:bg-[#1B2623] text-[10px] text-charcoal dark:text-[#E0E0E0] border border-slate-200 dark:border-slate-700/50 rounded px-1.5 py-1 focus:outline-none font-mono"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Wallet Source</label>
-                            <div className="flex border border-slate-border/50 rounded bg-obsidian/30 p-0.5">
-                              <button
-                                type="button"
-                                onClick={() => setSettleSource('hand')}
-                                className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
-                                  settleSource === 'hand'
-                                    ? 'bg-champagne text-obsidian'
-                                    : 'text-slate-muted active:text-white'
-                                }`}
-                              >
-                                Hand
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSettleSource('bank')}
-                                className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
-                                  settleSource === 'bank'
-                                    ? 'bg-champagne text-obsidian'
-                                    : 'text-slate-muted active:text-white'
-                                }`}
-                              >
-                                Bank
-                              </button>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 justify-end">
+                    {settlingDebtId === d.id && (
+                      <div className="mt-2 p-2 bg-obsidian/60 rounded border border-slate-border/30 space-y-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Settle Amount</label>
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            value={settleAmount}
+                            onChange={(e) => setSettleAmount(e.target.value)}
+                            className="w-24 bg-slate-50 dark:bg-[#1B2623] text-[10px] text-charcoal dark:text-[#E0E0E0] border border-slate-200 dark:border-slate-700/50 rounded px-1.5 py-1 focus:outline-none font-mono"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[8px] uppercase text-slate-muted font-bold flex-1">Wallet Source</label>
+                          <div className="flex border border-slate-border/50 rounded bg-obsidian/30 p-0.5">
                             <button
                               type="button"
-                              onClick={() => setSettlingDebtId(null)}
-                              className="text-slate-muted text-[10px] border border-slate-border/30 px-2 py-0.5 rounded active:scale-95 transition-all"
+                              onClick={() => setSettleSource('hand')}
+                              className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
+                                settleSource === 'hand'
+                                  ? 'bg-champagne text-obsidian'
+                                  : 'text-slate-muted active:text-white'
+                              }`}
                             >
-                              Cancel
+                              Hand
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleSettleDebt(d.id)}
-                              className="bg-champagne text-obsidian text-[10px] font-bold px-3.5 py-0.5 rounded shadow-gold-glow active:scale-95 transition-all"
+                              onClick={() => setSettleSource('bank')}
+                              className={`px-2.5 py-0.5 text-[8px] font-bold rounded transition-all ${
+                                settleSource === 'bank'
+                                  ? 'bg-champagne text-obsidian'
+                                  : 'text-slate-muted active:text-white'
+                              }`}
                             >
-                              Pay
+                              Bank
                             </button>
                           </div>
                         </div>
-                      )}
-                    </div>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setSettlingDebtId(null)}
+                            className="text-slate-muted text-[10px] border border-slate-border/30 px-2 py-0.5 rounded active:scale-95 transition-all"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSettleDebt(d.id)}
+                            className="bg-champagne text-obsidian text-[10px] font-bold px-3.5 py-0.5 rounded shadow-gold-glow active:scale-95 transition-all"
+                          >
+                            Pay
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                );
+                ), {
+                  edit: () => handleStartEditDebt(d),
+                  remove: () => handleDeleteDebt(d.id),
+                  label: 'trust ledger',
+                }, { className: 'rounded-lg border border-slate-border/20' });
               })
             )}
           </div>
@@ -2297,40 +2205,34 @@ export default function Dashboard() {
             </div>
 
             {/* Notebook Footer Toolbar */}
-            <div className="flex justify-between items-center text-[10px] text-slate-muted">
-              <span>{notebookText.length} characters | {notebookText.split('\n').filter(Boolean).length} lines</span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleClearNotebook}
-                  className="px-2.5 py-1 text-rose-500 dark:text-rose-400 font-semibold hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCopyNotebook}
-                  className={`px-3 py-1 font-semibold rounded transition-all active:scale-95 flex items-center gap-1 cursor-pointer ${
-                    copiedNotebook 
-                      ? 'bg-emerald text-white shadow-sm'
-                      : 'bg-slate-100 dark:bg-[#1C2623] text-charcoal dark:text-white border border-slate-200/50 dark:border-slate-700/50'
-                  }`}
-                >
-                  {copiedNotebook ? (
-                    <>
-                      <Check className="h-3 w-3" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-3 w-3" />
-                      Copy All
-                    </>
-                  )}
-                </button>
+            {renderSwipeActions('notebook-footer', (
+              <div className="flex justify-between items-center text-[10px] text-slate-muted">
+                <span>{notebookText.length} characters | {notebookText.split('\n').filter(Boolean).length} lines</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyNotebook}
+                    className={`px-3 py-1 font-semibold rounded transition-all active:scale-95 flex items-center gap-1 cursor-pointer ${
+                      copiedNotebook
+                        ? 'bg-emerald text-white shadow-sm'
+                        : 'bg-slate-100 dark:bg-[#1C2623] text-charcoal dark:text-white border border-slate-200/50 dark:border-slate-700/50'
+                    }`}
+                  >
+                    {copiedNotebook ? (
+                      <>
+                        <Check className="h-3 w-3" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-3 w-3" />
+                        Copy All
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
+            ), { label: 'notebook contents', remove: handleClearNotebook }, { className: 'rounded-lg' })}
           </div>
         </div>
 
@@ -2389,11 +2291,8 @@ export default function Dashboard() {
                       if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
                       descClean = descClean.replace('[DayCycle]', '').trim();
 
-                      return (
-                        <div 
-                          key={t.id} 
-                          className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 transition-all duration-200 group/item"
-                        >
+                      return renderSwipeActions(`today-${t.id}`, (
+                        <div className="flex items-center gap-3 p-3 text-left">
                           {/* Avatar icon */}
                           {getTransactionAvatar(t.category, t.description, t.type)}
 
@@ -2401,8 +2300,8 @@ export default function Dashboard() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full font-bold ${
-                                isBank 
-                                  ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
+                                isBank
+                                  ? 'bg-blue-50 text-blue-600 border border-blue-100/50'
                                   : isOption
                                     ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
                                     : 'bg-amber-50 text-amber-600 border border-amber-100/50'
@@ -2413,31 +2312,15 @@ export default function Dashboard() {
                             </div>
                             <p className="text-xs font-semibold text-charcoal mt-1 leading-tight">{descClean}</p>
                           </div>
-                          
-                          {/* Right side actions and amount */}
+
+                          {/* Amount */}
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <span className={`font-sans text-xs font-black mr-2 ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>
                               {isExpense ? '-' : '+'}Rs. {Math.abs(t.amount).toLocaleString()}
                             </span>
-                            
-                            <button
-                              onClick={() => handleStartEditTransaction(t)}
-                              className="p-1.5 text-sage rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
-                              title="Edit transaction parameters"
-                            >
-                              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            </button>
-
-                            <button
-                              onClick={() => handleDeleteTransaction(t.id)}
-                              className="p-1.5 text-sage rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
-                              title="Delete transaction"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            </button>
                           </div>
                         </div>
-                      );
+                      ), transactionActions(t), { className: 'rounded-2xl border border-slate-100' });
                     })}
                   </div>
                 </div>
@@ -2525,7 +2408,7 @@ export default function Dashboard() {
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-1 mt-1">
+                renderSwipeActions('cycle-base-income', (
                   <span 
                     onDoubleClick={handleStartEditCycleIncome}
                     className="font-sans text-xs text-charcoal font-extrabold cursor-pointer transition-colors"
@@ -2533,15 +2416,7 @@ export default function Dashboard() {
                   >
                     Rs. {cycleBaseIncome.toLocaleString()}
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleStartEditCycleIncome}
-                    className="p-1 text-sage transition-colors flex items-center justify-center active:scale-95 cursor-pointer"
-                    title="Edit Base Income"
-                  >
-                    <Pencil className="h-3 w-3" strokeWidth={1.5} />
-                  </button>
-                </div>
+                ), { label: 'base income', edit: handleStartEditCycleIncome }, { className: 'rounded-lg' })
               )}
             </div>
             <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
@@ -2716,7 +2591,6 @@ export default function Dashboard() {
                           .map((item) => {
                             const ledgerIndex = quickDeductionLedger.findIndex(candidate => candidate === item);
                             const isEditing = editingQuickIndex === ledgerIndex;
-                            const isRevealed = revealedQuickIndex === ledgerIndex;
 
                             if (isEditing) {
                               return (
@@ -2749,33 +2623,16 @@ export default function Dashboard() {
                               );
                             }
 
-                            return (
-                              <div
-                                key={`${item.date}-${ledgerIndex}`}
-                                className="relative overflow-hidden rounded-2xl touch-pan-y"
-                                onPointerDown={(event) => setQuickSwipeStartX(event.clientX)}
-                                onPointerUp={(event) => {
-                                  if (quickSwipeStartX === null) return;
-                                  const delta = event.clientX - quickSwipeStartX;
-                                  if (delta < -35) setRevealedQuickIndex(ledgerIndex);
-                                  if (delta > 35) setRevealedQuickIndex(null);
-                                  setQuickSwipeStartX(null);
-                                }}
-                              >
-                                <div className={`absolute inset-y-0 right-0 flex ${isRevealed ? 'z-10' : 'z-0'}`}>
-                                  <button type="button" onClick={() => handleStartEditQuickDeduction(ledgerIndex, item)} className="flex w-12 items-center justify-center bg-amber-400 text-charcoal" title="Edit deduction">
-                                    <Pencil className="h-4 w-4" />
-                                  </button>
-                                  <button type="button" onClick={() => handleDeleteQuickDeduction(ledgerIndex)} className="flex w-12 items-center justify-center bg-rose-500 text-white" title="Delete deduction">
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                                <div className={`relative flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-3 transition-transform duration-200 ${isRevealed ? '-translate-x-24' : 'translate-x-0'}`}>
-                                  <span className="truncate text-xs font-bold text-charcoal">{item.description || 'Quick remaining deduction'}</span>
-                                  <span className="ml-2 text-xs font-extrabold text-rose-500">- Rs. {item.amount.toLocaleString()}</span>
-                                </div>
+                            return renderSwipeActions(`quick-${ledgerIndex}`, (
+                              <div className="flex items-center justify-between p-3">
+                                <span className="truncate text-xs font-bold text-charcoal">{item.description || 'Quick remaining deduction'}</span>
+                                <span className="ml-2 text-xs font-extrabold text-rose-500">- Rs. {item.amount.toLocaleString()}</span>
                               </div>
-                            );
+                            ), {
+                              edit: () => handleStartEditQuickDeduction(ledgerIndex, item),
+                              remove: () => handleDeleteQuickDeduction(ledgerIndex),
+                              label: 'deduction',
+                            }, { className: 'rounded-2xl border border-slate-100' });
                           })}
                         {items
                           .filter(t => t.type === 'expense')
@@ -2790,11 +2647,8 @@ export default function Dashboard() {
                           if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
                           descClean = descClean.replace('[DayCycle]', '').trim();
 
-                          return (
-                            <div 
-                              key={t.id} 
-                              className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 transition-all duration-200 group/item text-left"
-                            >
+                          return renderSwipeActions(`cycle-${t.id}`, (
+                            <div className="flex items-center gap-3 p-3 text-left">
                               {/* Avatar */}
                               {getTransactionAvatar(t.category, t.description, t.type)}
 
@@ -2802,8 +2656,8 @@ export default function Dashboard() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full font-bold ${
-                                    isBank 
-                                      ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
+                                    isBank
+                                      ? 'bg-blue-50 text-blue-600 border border-blue-100/50'
                                       : isOption
                                         ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
                                         : 'bg-amber-50 text-amber-600 border border-amber-100/50'
@@ -2814,31 +2668,15 @@ export default function Dashboard() {
                                 </div>
                                 <p className="text-xs font-semibold text-charcoal mt-1 leading-tight">{descClean}</p>
                               </div>
-                              
-                              {/* Amount & Actions */}
+
+                              {/* Amount */}
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 <span className={`font-sans text-xs font-black mr-2 ${isExpense ? 'text-rose-500' : 'text-emerald-600'}`}>
                                   {isExpense ? '-' : '+'}Rs. {Math.abs(t.amount).toLocaleString()}
                                 </span>
-                                
-                                <button
-                                  onClick={() => handleStartEditTransaction(t)}
-                                  className="p-1.5 text-sage rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
-                                  title="Edit transaction"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleDeleteTransaction(t.id)}
-                                  className="p-1.5 text-sage rounded-full transition-colors active:scale-90 cursor-pointer flex items-center justify-center"
-                                  title="Delete transaction"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                </button>
                               </div>
                             </div>
-                          );
+                          ), transactionActions(t), { className: 'rounded-2xl border border-slate-100' });
                         })}
                       </div>
                     )}
@@ -2954,10 +2792,7 @@ export default function Dashboard() {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
         
-        // Prefix YYYY-MM
-        const year = d.getFullYear();
-        const monthNum = String(d.getMonth() + 1).padStart(2, '0');
-        const prefix = `${year}-${monthNum}`;
+        const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         list.push({ label, prefix });
       }
       return list;
@@ -2991,74 +2826,15 @@ export default function Dashboard() {
     isCurrentMonth: boolean
   ) {
     const isExpanded = expandedMonths[monthName] || false;
-    
-    // Filter transactions for this specific calendar month
-    const monthTransactions = transactions.filter(t => t.date && t.date.startsWith(monthPrefix));
-    
-    const monthIncome = monthTransactions
-      .filter(t => t.type === 'income' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const monthExpenses = monthTransactions
-      .filter(t =>
-        t.type === 'expense' &&
-        t.category !== 'Savings Sweep' &&
-        t.category !== 'Debt' &&
-        t.category !== 'Debt Settlement' &&
-        !t.description.includes('[DayCycle]')
-      )
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    const monthSweeps = monthTransactions
-      .filter(t => t.category === 'Savings Sweep')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    // Premium spending outlay categories
-    const foodExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category === 'Food' && !t.description.includes('[DayCycle]')
-      )
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    const travelExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category.includes('Travel') && !t.description.includes('[DayCycle]')
-      )
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    const rentUtilityExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && ['Rent', 'Electricity'].includes(t.category) && !t.description.includes('[DayCycle]')
-      )
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    const generalExpenses = monthTransactions
-      .filter(t => t.type === 'expense' && t.category === 'General' && !t.description.includes('[DayCycle]')
-      )
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-    const regularMonthTransactions = monthTransactions.filter(
-      t => !t.description.includes('[DayCycle]')
-    );
-
-    // Group month transactions by date
-    const groupedByDate = regularMonthTransactions.reduce((acc: { [key: string]: Transaction[] }, t) => {
-      if (!t.date) return acc;
-      if (!acc[t.date]) acc[t.date] = [];
-      acc[t.date].push(t);
-      return acc;
-    }, {});
-
-    const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
-
-    const formatCurrency = (val: number) => {
-      return `Rs. ${val.toLocaleString()}`;
-    };
 
     return (
-      <div key={monthName} className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm transition-all duration-300">
+      <div key={monthName} className="border border-[var(--border-color)] rounded-2xl overflow-hidden bg-[var(--surface-bg)] shadow-sm">
         
         {/* Accordion Header */}
         <button
           type="button"
           onClick={() => toggleMonth(monthName)}
+          aria-expanded={isExpanded}
           className="w-full flex items-center justify-between min-h-[48px] px-4 py-3 text-xs font-bold transition-all text-charcoal active:scale-[0.99] cursor-pointer"
         >
           <div className="flex items-center gap-1.5">
@@ -3075,188 +2851,13 @@ export default function Dashboard() {
 
         {/* Accordion Body */}
         {isExpanded && (
-          <div className="p-4 border-t border-slate-100 space-y-5 text-xs bg-slate-50/50">
+          <div className="p-2 sm:p-4 border-t border-[var(--border-color)] space-y-5 text-xs">
             
-            {/* Top metrics summary */}
-            <div className="grid grid-cols-3 gap-2.5 text-center">
-              <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
-                <span className="text-[8px] uppercase tracking-wider text-sage font-bold block mb-1">Total Income</span>
-                <span className="font-sans text-xs text-charcoal font-extrabold block mt-0.5">{formatCurrency(monthIncome)}</span>
-              </div>
-              <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
-                <span className="text-[8px] uppercase tracking-wider text-sage font-bold block mb-1">Total Spent</span>
-                <span className="font-sans text-xs text-rose-500 font-extrabold block mt-0.5">{formatCurrency(monthExpenses)}</span>
-              </div>
-              <div className="bg-white border border-slate-100 p-2.5 rounded-xl shadow-sm">
-                <span className="text-[8px] uppercase tracking-wider text-sage font-bold block mb-1">Saved Sweeps</span>
-                <span className="font-sans text-xs text-emerald-600 font-extrabold block mt-0.5">{formatCurrency(monthSweeps)}</span>
-              </div>
-            </div>
-
-            {/* Spending Outlay */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <span className="text-[8px] uppercase tracking-wider text-sage font-bold block">Spending Outlay</span>
-              
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">Food & Groceries</span>
-                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(foodExpenses)}</span>
-                </div>
-                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">Commutes & Highway</span>
-                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(travelExpenses)}</span>
-                </div>
-                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">Rent & Utility Bills</span>
-                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(rentUtilityExpenses)}</span>
-                </div>
-                <div className="bg-white border border-slate-100 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-                  <span className="text-[9px] text-sage font-bold uppercase tracking-wider">General / Other</span>
-                  <span className="font-sans text-xs font-extrabold text-charcoal mt-1">{formatCurrency(generalExpenses)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* DIRECT DATE TIMELINE ACCORDION */}
-            <div className="space-y-2 pt-3 border-t border-slate-100">
-              <span className="text-[8px] uppercase tracking-wider text-sage font-bold block">Date Timeline</span>
-              
-              {sortedDates.length === 0 ? (
-                <p className="text-xs text-sage italic text-center py-2 bg-white border border-slate-100 rounded-xl">No transactions recorded</p>
-              ) : (
-                <div className="space-y-2">
-                  {sortedDates.map(dateStr => {
-                    const dayItems = groupedByDate[dateStr];
-                    const dateKey = `${monthName}-${dateStr}`;
-                    const isDateExpanded = !!expandedMonthlyDates[dateKey];
-                    const daySpent = dayItems
-                      .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
-                      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-                    
-                    const dateParts = dateStr.split('-');
-                    const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : dateStr;
-
-                    return (
-                      <div key={dateStr} className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-sm">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedMonthlyDates(prev => ({ ...prev, [dateKey]: !isDateExpanded }))}
-                          className="w-full flex justify-between items-center min-h-[40px] px-3 py-2.5 text-[10px] transition-all text-charcoal font-bold active:scale-[0.99] cursor-pointer"
-                        >
-                          <span>{formattedDate}</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sage">Spent: <span className="text-charcoal font-bold">{formatCurrency(daySpent)}</span></span>
-                            <ChevronDown className={`h-3 w-3 text-sage transition-transform duration-200 ${isDateExpanded ? 'rotate-180' : ''}`} strokeWidth={2} />
-                          </div>
-                        </button>
-
-                        {isDateExpanded && (
-                          <div className="border-t border-slate-100 p-2 space-y-2 bg-slate-50/50">
-                            {dayItems.map(t => {
-                              const isExpense = t.type === 'expense';
-                              const isBank = t.description.startsWith('[Bank]');
-                              const isOption = t.description.startsWith('[Option]');
-                              const sourceLabel = isBank ? 'Bank' : isOption ? 'Option' : 'Hand';
-                              
-                              let descClean = t.description;
-                              if (descClean.startsWith('[Bank]')) descClean = descClean.replace('[Bank]', '').trim();
-                              if (descClean.startsWith('[Hand]')) descClean = descClean.replace('[Hand]', '').trim();
-                              if (descClean.startsWith('[Option]')) descClean = descClean.replace('[Option]', '').trim();
-
-                              const isSwiped = swipedTransactionId === t.id;
-
-                              return (
-                                <div 
-                                  key={t.id} 
-                                  onTouchStart={handleItemTouchStart}
-                                  onTouchMove={(e) => handleItemTouchMove(e, t.id)}
-                                  onTouchEnd={handleItemTouchEnd}
-                                  onMouseDown={handleItemMouseDown}
-                                  onMouseMove={(e) => handleItemMouseMove(e, t.id)}
-                                  onMouseUp={handleItemMouseUp}
-                                  onMouseLeave={handleItemMouseUp}
-                                  className="relative overflow-hidden rounded-xl border border-slate-100 bg-white select-none"
-                                >
-                                  {/* Action Buttons underneath */}
-                                  <div 
-                                    className="absolute right-0 top-0 bottom-0 flex items-center bg-slate-50 dark:bg-[#1B2623] transition-all duration-305 z-10"
-                                    style={{
-                                      width: isSwiped ? '80px' : '0px',
-                                      opacity: isSwiped ? 1 : 0,
-                                      overflow: 'hidden'
-                                    }}
-                                  >
-                                    <div className="flex items-center justify-center w-full h-full gap-2 px-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleStartEditTransaction(t);
-                                          setSwipedTransactionId(null);
-                                        }}
-                                        className="p-1.5 text-sage hover:text-charcoal dark:hover:text-white rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
-                                        title="Edit transaction"
-                                      >
-                                        <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleDeleteTransaction(t.id);
-                                          setSwipedTransactionId(null);
-                                        }}
-                                        className="p-1.5 text-rose-500 hover:text-rose-700 rounded-full transition-all active:scale-90 cursor-pointer flex items-center justify-center bg-white dark:bg-[#22302C] shadow-sm border border-slate-100 dark:border-slate-800"
-                                        title="Delete transaction"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* Main Content Row */}
-                                  <div 
-                                    className="flex items-center gap-3 p-2.5 transition-transform duration-305 text-left text-[10px]"
-                                    style={{
-                                      transform: isSwiped ? 'translateX(-80px)' : 'translateX(0px)'
-                                    }}
-                                  >
-                                    {/* Avatar */}
-                                    {getTransactionAvatar(t.category, t.description, t.type)}
-
-                                    {/* Details */}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className={`text-[7px] uppercase px-1 py-0.2 rounded font-bold ${
-                                          isBank 
-                                            ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
-                                            : isOption
-                                              ? 'bg-purple-50 text-purple-600 border border-purple-100/50'
-                                              : 'bg-amber-50 text-amber-600 border border-amber-100/50'
-                                        }`}>
-                                          {sourceLabel}
-                                        </span>
-                                        <span className="text-[8px] text-sage font-semibold">{t.category}</span>
-                                      </div>
-                                      <p className="text-[11px] font-semibold text-charcoal mt-0.5 leading-tight">{descClean}</p>
-                                    </div>
-                                    <span className={`font-sans text-[11px] font-black flex-shrink-0 ${isExpense ? 'text-rose-500' : 'text-emerald-600'} mr-1`}>
-                                      {isExpense ? '-' : '+'}{formatCurrency(Math.abs(t.amount))}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {renderMonthlyStatement(monthName, monthPrefix)}
 
             {/* Print statement button */}
             <button
-              onClick={() => handlePrintMonthlyStatement(monthName)}
+              onClick={() => handlePrintMonthlyStatement(monthName, monthPrefix)}
               className="w-full bg-black border-none min-h-[44px] rounded-full text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all mt-3 active:scale-[0.98] cursor-pointer shadow-sm"
             >
               <Printer className="h-3.5 w-3.5" strokeWidth={2} />
