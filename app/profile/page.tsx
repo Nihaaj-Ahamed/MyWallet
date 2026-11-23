@@ -15,6 +15,7 @@ import {
   Mail,
   Moon,
   Sun,
+  Trash2,
   UserRound,
 } from 'lucide-react';
 
@@ -29,6 +30,7 @@ export default function ProfilePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [resettingData, setResettingData] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
@@ -122,6 +124,30 @@ export default function ProfilePage() {
       setNewPassword('');
       setConfirmPassword('');
       setNotice('Password changed successfully.');
+    }
+  };
+
+  const resetWalletData = async () => {
+    if (!supabase || !user || resettingData) return;
+    if (!window.confirm('Permanently delete your transactions, cycles, debts, and savings? Wallet balances will return to zero, and this browser’s notes, fixed outflows, and preferences will reset.')) return;
+
+    setResettingData(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const { error: resetError } = await supabase.rpc('reset_wallet_data');
+      if (resetError) throw resetError;
+
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('vault_')) localStorage.removeItem(key);
+      }
+      window.location.replace('/');
+    } catch (error) {
+      const message = error && typeof error === 'object' && 'message' in error
+        ? String(error.message)
+        : 'Please try again.';
+      setError(`Unable to finish resetting wallet data. ${message}`);
+      setResettingData(false);
     }
   };
 
@@ -248,7 +274,16 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <button type="button" onClick={signOut} className="mt-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-rose-200 px-5 py-3 text-sm font-bold text-rose-600 transition active:scale-[0.98] dark:border-rose-500/20 dark:text-rose-400">
+        <section className="glass-panel mt-4 p-5 md:p-6">
+          <h2 className="text-base font-extrabold">Wallet Data</h2>
+          <p className="mt-1 text-sm text-sage">Start fresh with empty wallets and a cleared ledger.</p>
+          <button type="button" onClick={resetWalletData} disabled={!user || resettingData} className="mt-4 flex min-h-[44px] items-center gap-2 rounded-full border border-rose-200 px-5 py-3 text-sm font-bold text-rose-600 disabled:opacity-50 dark:border-rose-500/20 dark:text-rose-400">
+            {resettingData ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {resettingData ? 'Resetting wallet data…' : 'Reset All Data'}
+          </button>
+        </section>
+
+        <button type="button" onClick={signOut} disabled={resettingData} className="mt-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-rose-200 px-5 py-3 text-sm font-bold text-rose-600 transition active:scale-[0.98] dark:border-rose-500/20 dark:text-rose-400">
           <LogOut className="h-4 w-4" />
           Sign out
         </button>

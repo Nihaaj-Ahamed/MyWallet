@@ -121,6 +121,9 @@ export interface Database {
         };
       };
     };
+    Functions: {
+      reset_wallet_data: { Args: never; Returns: undefined };
+    };
   };
 }
 
