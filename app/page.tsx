@@ -432,13 +432,15 @@ export default function Dashboard() {
         .filter(item => item.cycleId === activeCycle.id)
         .reduce((sum, item) => sum + item.amount, 0)
     : 0;
-  const tickedCycleExpenses = cycleTransactions
-    .filter(t =>
-      t.type === 'expense' &&
-      t.description.includes('[DayCycle]')
-    )
+  const isFixedOutflowExpense = (t: Transaction) =>
+    t.type === 'expense' &&
+    (t.category === 'Rent' || t.category === 'Electricity' || t.description.includes('Fixed Outflow:'));
+  const countsTowardCycleSpending = (t: Transaction) =>
+    isFixedOutflowExpense(t) || (t.type === 'expense' && t.description.includes('[DayCycle]'));
+  const cycleTransactionSpent = cycleTransactions
+    .filter(countsTowardCycleSpending)
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  const cycleExpenses = tickedCycleExpenses + quickCycleSpent;
+  const cycleExpenses = cycleTransactionSpent + quickCycleSpent;
   
   const remainingCycleBalance = Math.max(0, cycleBaseIncome - cycleExpenses);
 
@@ -1657,9 +1659,7 @@ export default function Dashboard() {
         const printRegularTransactions = printTransactions.filter(
           t => !t.description.includes('[DayCycle]')
         );
-        const printDayCycleTransactions = printTransactions.filter(
-          t => t.type === 'expense' && t.description.includes('[DayCycle]')
-        );
+        const printDayCycleTransactions = printTransactions.filter(countsTowardCycleSpending);
         const printCycleDeductions = quickDeductionLedger.filter(
           item => item.date.startsWith(printPrefix)
         );
@@ -1669,7 +1669,7 @@ export default function Dashboard() {
           .reduce((sum, t) => sum + t.amount, 0);
 
         const printExpenses = printRegularTransactions
-          .filter(t => t.type === 'expense' && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
+          .filter(t => t.type === 'expense' && !isFixedOutflowExpense(t) && t.category !== 'Savings Sweep' && t.category !== 'Debt' && t.category !== 'Debt Settlement')
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
         const printSweeps = printRegularTransactions
@@ -1692,12 +1692,14 @@ export default function Dashboard() {
           .filter(t => t.type === 'expense' && t.category === 'General')
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-        const printTickedDayCycleExpenses = printDayCycleTransactions
+        const printCycleTransactionSpent = printDayCycleTransactions
           .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-        const printCustomCycleDeduction = printCycleDeductions
+        const printQuickCycleDeduction = printCycleDeductions
           .reduce((sum, item) => sum + item.amount, 0);
+        const printTotalCycleDeductions = printCycleTransactionSpent + printQuickCycleDeduction;
+        const printLogTransactions = printRegularTransactions.filter(t => !isFixedOutflowExpense(t));
         const printDetailedDates = Array.from(new Set(
-          printRegularTransactions.map(t => t.date)
+          printLogTransactions.map(t => t.date)
         )).sort((a, b) => b.localeCompare(a));
         const printCycleSummary = cycles
           .map((cycle, index) => {
@@ -1747,7 +1749,7 @@ export default function Dashboard() {
               </div>
               <div className="print-statement-total">
                 <span>Net Ledger Balance</span>
-                <strong>Rs. {(printIncome - printExpenses - printTickedDayCycleExpenses - printSweeps).toLocaleString()}</strong>
+                <strong>Rs. {(printIncome - printExpenses - printCycleTransactionSpent - printSweeps).toLocaleString()}</strong>
               </div>
             </header>
 
@@ -1764,7 +1766,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex justify-between text-xs font-mono">
                   <span>Day Cycle Deductions:</span>
-                  <span>Rs. {(printTickedDayCycleExpenses + printCustomCycleDeduction).toLocaleString()}</span>
+                  <span>Rs. {printTotalCycleDeductions.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-xs font-mono">
                   <span>Deposited to Savings:</span>
@@ -1821,6 +1823,10 @@ export default function Dashboard() {
                         <td className="py-1 text-right">-Rs. {item.amount.toLocaleString()}</td>
                       </tr>
                     ))}
+                    <tr className="print-statement-subtotal">
+                      <th scope="row" colSpan={2} className="text-left">Total Day Cycle Deductions</th>
+                      <td className="text-right">-Rs. {printTotalCycleDeductions.toLocaleString()}</td>
+                    </tr>
                   </tbody>
                 </table>
               )}
@@ -1859,7 +1865,7 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {printDetailedDates.map(date => {
-                      const dateTransactions = printRegularTransactions
+                      const dateTransactions = printLogTransactions
                         .filter(t => t.date === date)
                         .sort((a, b) => b.created_at.localeCompare(a.created_at));
                       const dailySpent = dateTransactions
@@ -2338,6 +2344,7 @@ export default function Dashboard() {
     const todayTransactions = transactions.filter(t =>
       t.date &&
       t.date >= todayStr &&
+      !isFixedOutflowExpense(t) &&
       !t.description.includes('[DayCycle]')
     );
     const groupedTimelineToday = groupTransactionsByDate(todayTransactions);
@@ -2467,7 +2474,7 @@ export default function Dashboard() {
 
     const calculateDailySpent = (items: Transaction[] = [], date: string) => {
       const transactionSpent = items
-        .filter(t => t.type === 'expense' && t.description.includes('[DayCycle]'))
+        .filter(countsTowardCycleSpending)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
       const quickSpent = activeCycle
         ? quickDeductionLedger
