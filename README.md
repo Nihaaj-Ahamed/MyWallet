@@ -1,6 +1,8 @@
 # MyWallet — Financial Asset Ledger
 
-MyWallet is a responsive financial tracker for income, expenses, debts, bank cash, hand cash, savings, and 10-calendar-day Day Cycles. It supports Supabase authentication and PWA installation.
+MyWallet helps you see where your money came from, where it went, and how much you have left. Track cash in hand and money in the bank separately, record bills and everyday spending, and keep track of what you owe or are owed.
+
+Use Day Cycles to manage a spending budget without changing your actual wallet balances. Monthly History shows your income, spending, and debt activity, and you can download each month's statement as a PDF.
 
 Developed by **Nihaaj Ahamed MS** 
 
@@ -32,8 +34,8 @@ Developed by **Nihaaj Ahamed MS**
 - The active cycle contains 10 calendar days, from its base-income date through 9 days later.
 - Base Income minus cycle spending determines Remaining.
 - Hand Money and Remaining are separate values.
-- Normal income can be added to the active cycle base income.
-- The Income form checkbox starts a new Day Cycle instead.
+- Income goes into the selected wallet. Tick the option to also add it to the current Day Cycle Base Income, or choose to start a new cycle with it.
+- Day Count shows how many different dates have transactions in the active cycle.
 - Only ticked expenses and cycle deductions reduce Day Cycle Remaining.
 - Unticked expenses affect the wallet and ledger without changing cycle Remaining.
 

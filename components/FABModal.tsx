@@ -26,6 +26,7 @@ export default function FABModal() {
   const { 
     addExpense, 
     addIncome, 
+    activeCycle,
     addWithdrawal,
     addDebt, 
     reconcileCash,
@@ -46,6 +47,7 @@ export default function FABModal() {
   // Income destination state
   const [incomeDestination, setIncomeDestination] = useState<'hand' | 'bank' | 'option'>('bank');
   const [startNewCycleWithIncome, setStartNewCycleWithIncome] = useState(false);
+  const [countIncomeInCycle, setCountIncomeInCycle] = useState(false);
   const [countExpenseInDayCycle, setCountExpenseInDayCycle] = useState(false);
 
   // Debt states
@@ -66,6 +68,7 @@ export default function FABModal() {
     setPaymentSource('hand');
     setIncomeDestination('bank');
     setStartNewCycleWithIncome(false);
+    setCountIncomeInCycle(false);
     setCountExpenseInDayCycle(false);
     setPersonName('');
     setDebtType('lent');
@@ -103,7 +106,8 @@ export default function FABModal() {
           incomeDestination,
           startNewCycleWithIncome,
           date,
-          undefined
+          undefined,
+          countIncomeInCycle
         );
       } else if (activeTab === 'withdrawal') {
         const numAmount = parseFloat(amount);
@@ -386,13 +390,30 @@ export default function FABModal() {
                       <input
                         type="checkbox"
                         checked={startNewCycleWithIncome}
-                        onChange={(event) => setStartNewCycleWithIncome(event.target.checked)}
+                        onChange={(event) => {
+                          setStartNewCycleWithIncome(event.target.checked);
+                          if (event.target.checked) setCountIncomeInCycle(false);
+                        }}
                         className="h-4 w-4 accent-charcoal dark:accent-[#4DB6AC]"
                       />
                       <span className="text-xs font-bold text-charcoal dark:text-[#E0E0E0]">
                         Start a new Day Cycle with this income
                       </span>
                     </label>
+
+                    {activeCycle && !startNewCycleWithIncome && (
+                      <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-700/50 dark:bg-[#22302C]">
+                        <input
+                          type="checkbox"
+                          checked={countIncomeInCycle}
+                          onChange={event => setCountIncomeInCycle(event.target.checked)}
+                          className="h-4 w-4 accent-charcoal dark:accent-[#4DB6AC]"
+                        />
+                        <span className="text-xs font-bold text-charcoal dark:text-[#E0E0E0]">
+                          Add this income to the current Day Cycle Base Income
+                        </span>
+                      </label>
+                    )}
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase tracking-wider text-sage font-bold block">Description</label>

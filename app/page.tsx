@@ -191,13 +191,6 @@ export default function Dashboard() {
     mode?: 'quick' | 'custom';
   }
 
-  interface DayCounterState {
-    cycleId: string;
-    day: number;
-    status: 'running' | 'paused';
-    lastCountDate: string | null;
-  }
-
   const [quickDeductionAmount, setQuickDeductionAmount] = useState('1000');
   const [customQuickDeduction, setCustomQuickDeduction] = useState(false);
   const [customQuickAmount, setCustomQuickAmount] = useState('');
@@ -213,60 +206,10 @@ export default function Dashboard() {
       return [];
     }
   });
-  const [dayCounter, setDayCounter] = useState<DayCounterState>({
-    cycleId: '',
-    day: 0,
-    status: 'running',
-    lastCountDate: null,
-  });
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     localStorage.setItem('vault_day_cycle_quick_deductions', JSON.stringify(quickDeductionLedger));
   }, [quickDeductionLedger]);
-
-  useEffect(() => {
-    if (!activeCycle) return;
-    const saved = localStorage.getItem(`vault_day_counter_${activeCycle.id}`);
-    if (saved) {
-      try {
-        setDayCounter(JSON.parse(saved));
-        return;
-      } catch {
-        // Fall through to a fresh counter.
-      }
-    }
-    setDayCounter({
-      cycleId: activeCycle.id,
-      day: 0,
-      status: 'running',
-      lastCountDate: getLocalDateString(),
-    });
-  }, [activeCycle?.id]);
-
-  useEffect(() => {
-    if (!activeCycle) return;
-    localStorage.setItem(`vault_day_counter_${activeCycle.id}`, JSON.stringify(dayCounter));
-  }, [activeCycle?.id, dayCounter]);
-
-  useEffect(() => {
-    if (!activeCycle || dayCounter.status !== 'running') return;
-
-    const advanceAtMidnight = () => {
-      const today = getLocalDateString();
-      if (dayCounter.lastCountDate === today) return;
-      setDayCounter(prev => ({
-        cycleId: activeCycle.id,
-        day: prev.day + 1,
-        status: 'running',
-        lastCountDate: today,
-      }));
-    };
-
-    advanceAtMidnight();
-    const interval = window.setInterval(advanceAtMidnight, 1000);
-    return () => window.clearInterval(interval);
-  }, [activeCycle?.id, dayCounter.status, dayCounter.lastCountDate]);
 
   // Expanded monthly accordion states (stores expanded status per monthYear string)
   const [expandedMonths, setExpandedMonths] = useState<{ [key: string]: boolean }>({});
@@ -545,25 +488,6 @@ export default function Dashboard() {
     if (!confirm("Delete this Day Cycle deduction?")) return;
     setQuickDeductionLedger(prev => prev.filter((_, itemIndex) => itemIndex !== index));
     setEditingQuickIndex(null);
-  };
-
-  const handleResetDayCounter = () => {
-    if (!activeCycle) return;
-    setDayCounter({
-      cycleId: activeCycle.id,
-      day: 1,
-      status: 'running',
-      lastCountDate: getLocalDateString(),
-    });
-  };
-
-  const handleToggleDayCounter = () => {
-    if (!activeCycle) return;
-    setDayCounter(prev => ({
-      ...prev,
-      cycleId: activeCycle.id,
-      status: prev.status === 'running' ? 'paused' : 'running',
-    }));
   };
 
   // Outflow direct text editing
@@ -1630,9 +1554,10 @@ export default function Dashboard() {
       description: string;
       category: string;
       amount: number;
+      transaction?: Transaction;
     };
-    const walletActivity = printTransactions
-      .filter(t => t.category !== 'Debt' && t.category !== 'Debt Settlement')
+    const isDebtTransaction = (t: { category: string }) => t.category === 'Debt' || t.category === 'Debt Settlement';
+    const walletMovements = [...printTransactions]
       .sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at))
       .flatMap((transaction): WalletActivity[] => {
         const { id, date, description, category, amount } = transaction;
@@ -1651,12 +1576,14 @@ export default function Dashboard() {
           : category === 'Savings Sweep' || category === 'Adjustment' ? 'Hand Money'
           : 'Unspecified';
         const detail = description.replace(/^\[(Bank|Hand|Option)\]\s*/, '').replace('[DayCycle]', '').trim();
-        return [{ key: id, date, wallet, category, description: detail, amount }];
+        return [{ key: id, date, wallet, category, description: detail, amount, transaction }];
       });
+    const walletActivity = walletMovements.filter(item => !isDebtTransaction(item));
+    const debtActivity = walletMovements.filter(isDebtTransaction);
     const walletOutflows = (wallet: WalletLabel) => walletActivity.filter(item => item.wallet === wallet && item.amount < 0);
     const formatWalletAmount = (amount: number) =>
       `${amount < 0 ? '-' : amount > 0 ? '+' : ''}Rs. ${Math.abs(amount).toLocaleString()}`;
-    const renderWalletActivity = (items: WalletActivity[], showWallet = false) => (
+    const renderWalletActivity = (items: WalletActivity[], showWallet = false, totalLabel = 'Total') => (
       <table className="w-full text-xs font-mono">
         <thead>
           <tr className="text-left">
@@ -1674,16 +1601,19 @@ export default function Dashboard() {
             </tr>
           )}
           {items.map(item => (
-            <tr key={item.key}>
+            <tr key={item.key} {...(!forPrint && item.transaction && isDebtTransaction(item)
+              ? swipeHandlers<HTMLTableRowElement>(`history-${item.transaction.id}`) : {})}>
               <td>{item.date}</td>
               {showWallet && <td>{item.wallet}</td>}
               <td>{item.category}</td>
               <td>{item.description}</td>
-              <td className="text-right">{formatWalletAmount(item.amount)}</td>
+              {item.transaction && isDebtTransaction(item)
+                ? renderTransactionAmount(item.transaction, formatWalletAmount(item.amount))
+                : <td className="text-right">{formatWalletAmount(item.amount)}</td>}
             </tr>
           ))}
           <tr className="print-statement-subtotal">
-            <th scope="row" colSpan={showWallet ? 4 : 3} className="text-left">Total</th>
+            <th scope="row" colSpan={showWallet ? 4 : 3} className="text-left">{totalLabel}</th>
             <td className="text-right">{formatWalletAmount(items.reduce((total, item) => total + item.amount, 0))}</td>
           </tr>
         </tbody>
@@ -1730,7 +1660,7 @@ export default function Dashboard() {
     const printQuickCycleDeduction = printCycleDeductions
       .reduce((sum, item) => sum + item.amount, 0);
     const printTotalCycleDeductions = printCycleTransactionSpent + printQuickCycleDeduction;
-    const printLogTransactions = printRegularTransactions.filter(t => !isFixedOutflowExpense(t));
+    const printLogTransactions = printRegularTransactions.filter(t => !isFixedOutflowExpense(t) && !isDebtTransaction(t));
     const logByDate = new Map<string, Transaction[]>();
     for (const transaction of printLogTransactions) {
       const day = logByDate.get(transaction.date);
@@ -1873,6 +1803,7 @@ export default function Dashboard() {
           </>)}
         </div>
 
+        <div className={forPrint ? "print-statement-columns" : "contents"}>
         {renderSection("Wallet Activity", <div className="statement-wallet-activity">
           {renderSection("Income & Money In", renderWalletActivity(walletActivity.filter(item => item.amount > 0), true))}
           {renderSection("Hand Money Outflows", renderWalletActivity(walletOutflows('Hand Money')))}
@@ -1886,6 +1817,8 @@ export default function Dashboard() {
             );
           })}
         </div>)}
+
+        {renderSection("Debt Transactions", renderWalletActivity(debtActivity, true, 'Net Debt Movement'))}
 
         {renderSection("Day Cycle Deductions", <>
           {printDayCycleTransactions.length === 0 && printCycleDeductions.length === 0 ? (
@@ -1954,6 +1887,8 @@ export default function Dashboard() {
             </div>
           )}
         </>)}
+
+        </div>
 
         {forPrint && <footer className="print-statement-footer">
           <span>Security ID Reference: VAULT-OFFICIAL-{monthName.replace(' ', '-').toUpperCase()}</span>
@@ -2541,27 +2476,10 @@ export default function Dashboard() {
 
         {/* Day Cycle-only quick controls */}
         <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-sage">Day Count</p>
-              <p className="mt-1 text-xl font-extrabold text-charcoal">Day {dayCounter.day}</p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleToggleDayCounter}
-                className="min-h-[44px] rounded-full border border-slate-200 bg-white px-3 text-[10px] font-bold text-charcoal"
-              >
-                {dayCounter.status === 'running' ? 'Stop' : 'Resume'}
-              </button>
-              <button
-                type="button"
-                onClick={handleResetDayCounter}
-                className="min-h-[44px] rounded-full border border-slate-200 bg-white px-3 text-[10px] font-bold text-charcoal"
-              >
-                Reset
-              </button>
-            </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-sage">Day Count</p>
+            <p className="mt-1 text-xl font-extrabold text-charcoal">Day {new Set(cycleTransactions.map(t => t.date)).size}</p>
+            <p className="text-[10px] text-sage">Days with transactions in this cycle</p>
           </div>
 
           <div className="border-t border-slate-200/50 pt-3">

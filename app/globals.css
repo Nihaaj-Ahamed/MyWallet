@@ -489,6 +489,27 @@ tr[data-swipe-row] > td {
     font-size: 8pt;
   }
 
+  .print-statement-columns {
+    column-count: 2;
+    column-gap: 4mm;
+  }
+
+  .print-statement-columns > section + section {
+    margin-top: 7pt;
+  }
+
+  .print-statement-columns :is(th, td) {
+    padding-inline: 2pt;
+  }
+
+  .print-statement-columns td:first-child {
+    white-space: nowrap;
+  }
+
+  .print-statement-columns .print-statement-cycle {
+    break-inside: avoid;
+  }
+
   .print-statement .statement-wallet-activity > section + section {
     margin-top: 5pt;
   }

@@ -39,7 +39,7 @@ interface WalletContextType {
   optionMoney: number;
   updateWalletBalance: (id: string, amount: number) => Promise<void>;
   addExpense: (amount: number, description: string, category: string, date: string, source?: 'hand' | 'bank', countInDayCycle?: boolean) => Promise<void>;
-  addIncome: (amount: number, description: string, destination: 'hand' | 'bank' | 'option', setCycle: boolean, startDate?: string, endDate?: string) => Promise<void>;
+  addIncome: (amount: number, description: string, destination: 'hand' | 'bank' | 'option', setCycle: boolean, startDate?: string, endDate?: string, countInCycle?: boolean) => Promise<void>;
   addWithdrawal: (amount: number, date: string) => Promise<void>;
   addDebt: (amount: number, personName: string, type: 'lent' | 'borrowed', description: string, source?: 'hand' | 'bank') => Promise<void>;
   settleDebt: (debtId: string, settleAmount: number, source?: 'hand' | 'bank') => Promise<void>;
@@ -342,7 +342,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     destination: 'hand' | 'bank' | 'option',
     setCycle: boolean,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    countInCycle = false
   ) => {
     let updatedSavings = [...savings];
     let updatedCycles = [...cycles];
@@ -426,8 +427,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return s;
       });
 
-      // Normal income increases the active Day Cycle base income.
-      if (activeCycle) {
+      if (activeCycle && countInCycle) {
         const updatedBaseIncome = activeCycle.income + amount;
         updatedCycles = cycles.map(c =>
           c.id === activeCycle.id ? { ...c, income: updatedBaseIncome } : c,
@@ -451,7 +451,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (isSupabaseConfigured() && supabase && userId) {
         try {
           await client.from('savings_vault').update({ current_balance: newWalletBalance } as any).eq('id', walletId).eq('user_id', userId);
-          if (activeCycle) {
+          if (activeCycle && countInCycle) {
             await client.from('cycles').update({
               income: activeCycle.income + amount,
             } as any).eq('id', activeCycle.id).eq('user_id', userId);
